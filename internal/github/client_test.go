@@ -143,6 +143,18 @@ func TestOpenPRsNullAuthor(t *testing.T) {
 	}
 }
 
+// GitHub follows a rename: the PRs of a renamed repo carry its new name, so
+// that they match the remote URL of a new clone.
+func TestOpenPRsRenamedRepo(t *testing.T) {
+	c, _ := server(t, func(gqlRequest) (int, string) {
+		return 200, `{"data":{"repository":{"nameWithOwner":"o/new","pullRequests":{"pageInfo":{"hasNextPage":false},"nodes":[{"number":1}]}}}}`
+	})
+	prs, err := c.OpenPRs(context.Background(), "o/old")
+	if err != nil || len(prs) != 1 || prs[0].Repo != "o/new" {
+		t.Fatalf("prs = %+v, err = %v", prs, err)
+	}
+}
+
 func TestOpenPRsGraphQLError(t *testing.T) {
 	c, _ := server(t, func(gqlRequest) (int, string) {
 		return 200, `{"data":{"repository":null},"errors":[{"message":"Could not resolve to a Repository"}]}`

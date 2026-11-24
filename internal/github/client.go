@@ -2,6 +2,7 @@ package github
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	_ "embed"
 	"encoding/json"
@@ -137,7 +138,8 @@ func (c *Client) OpenPRs(ctx context.Context, repo string) ([]PR, error) {
 	for {
 		var out struct {
 			Repository *struct {
-				PullRequests struct {
+				NameWithOwner string
+				PullRequests  struct {
 					PageInfo struct {
 						HasNextPage bool
 						EndCursor   string
@@ -154,8 +156,10 @@ func (c *Client) OpenPRs(ctx context.Context, repo string) ([]PR, error) {
 			return nil, fmt.Errorf("%s: repository not found", repo)
 		}
 		page := out.Repository.PullRequests
+		// GitHub follows a rename: the current name matches the remote of a new clone.
+		current := cmp.Or(out.Repository.NameWithOwner, repo)
 		for _, n := range page.Nodes {
-			prs = append(prs, n.pr(repo))
+			prs = append(prs, n.pr(current))
 		}
 		if !page.PageInfo.HasNextPage {
 			return prs, nil

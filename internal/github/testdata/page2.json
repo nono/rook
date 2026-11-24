@@ -1,6 +1,7 @@
 {
   "data": {
     "repository": {
+      "nameWithOwner": "o/r",
       "pullRequests": {
         "pageInfo": {"hasNextPage": false, "endCursor": "c2"},
         "nodes": [

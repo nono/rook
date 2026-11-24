@@ -14,6 +14,7 @@ import (
 func TestQueryAsksForMappedFields(t *testing.T) {
 	got, _ := queryPaths(t, prQuery)
 	want := []string{
+		"repository.nameWithOwner",
 		"repository.pullRequests.pageInfo.hasNextPage",
 		"repository.pullRequests.pageInfo.endCursor",
 		"repository.pullRequests.nodes.statusCheckRollup.state",
