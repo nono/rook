@@ -3,32 +3,54 @@
 package claude
 
 import (
-	"bytes"
 	"context"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 )
 
 // Session is a Claude Code process and the branch checked out in its directory.
 type Session struct {
-	Dir    string // the cwd of the process
-	Repo   string // "owner/name", as the remote URL gives it
-	Branch string // the remote branch, without "refs/heads/"
+	Dir  string // the cwd of the process
+	Repo string // "owner/name", as the remote URL gives it
+	// Branches are the names the PR branch can have on the remote, without
+	// "refs/heads/": the upstream's branch, then the local branch if its
+	// name differs. A branch made from origin/main has the upstream main
+	// until a push with -u, so the local name is needed too.
+	Branches []string
 }
 
-var remoteURL = regexp.MustCompile(`^(?:git@github\.com:|ssh://git@github\.com/|https://github\.com/)([^/]+/[^/]+?)(?:\.git)?$`)
-
-// RepoOf gives the "owner/name" of a GitHub remote URL.
-func RepoOf(url string) (string, bool) {
-	m := remoteURL.FindStringSubmatch(url)
-	if m == nil {
+// RepoOf gives the "owner/name" of a GitHub remote URL: scp-like
+// ("[user@]github.com:owner/name") or a URL ("ssh://", "https://", with a
+// user and a port or not), on github.com or ssh.github.com.
+func RepoOf(remote string) (string, bool) {
+	var host, path string
+	if strings.Contains(remote, "://") {
+		u, err := url.Parse(remote)
+		if err != nil {
+			return "", false
+		}
+		host, path = u.Hostname(), u.Path
+	} else {
+		h, p, ok := strings.Cut(remote, ":")
+		if !ok || strings.Contains(h, "/") {
+			return "", false
+		}
+		host = h[strings.LastIndex(h, "@")+1:]
+		path = p
+	}
+	if host = strings.ToLower(host); host != "github.com" && host != "ssh.github.com" {
 		return "", false
 	}
-	return m[1], true
+	path = strings.TrimSuffix(strings.Trim(path, "/"), ".git")
+	owner, name, ok := strings.Cut(path, "/")
+	if !ok || owner == "" || name == "" || strings.Contains(name, "/") {
+		return "", false
+	}
+	return path, true
 }
 
 // Find gives one session per distinct directory of the "claude" processes in
@@ -58,23 +80,24 @@ func Find(ctx context.Context, proc string) ([]Session, error) {
 	slices.Sort(dirs)
 	var out []Session
 	for _, dir := range slices.Compact(dirs) {
-		if repo, branch, ok := lookup(ctx, dir); ok {
-			out = append(out, Session{Dir: dir, Repo: repo, Branch: branch})
+		if repo, branches, ok := lookup(ctx, dir); ok {
+			out = append(out, Session{Dir: dir, Repo: repo, Branches: branches})
 		}
 	}
 	return out, nil
 }
 
-// lookup gives the repo and the branch of the checkout in dir: the upstream if
-// set, else the local branch on origin.
-func lookup(ctx context.Context, dir string) (repo, branch string, ok bool) {
+// lookup gives the repo and the branch names of the checkout in dir: the
+// upstream's remote and branch, then the local branch; with no upstream,
+// origin and the local branch.
+func lookup(ctx context.Context, dir string) (repo string, branches []string, ok bool) {
 	ref, ok := headRef(ctx, dir)
 	if !ok {
-		return "", "", false
+		return "", nil, false
 	}
 	up, err := gitOut(ctx, dir, "for-each-ref", "--format=%(upstream:remotename)%09%(upstream:remoteref)", ref)
 	if err != nil {
-		return "", "", false
+		return "", nil, false
 	}
 	remote, remoteRef, _ := strings.Cut(up, "\t")
 	if remote == "" {
@@ -82,13 +105,17 @@ func lookup(ctx context.Context, dir string) (repo, branch string, ok bool) {
 	}
 	url, err := gitOut(ctx, dir, "remote", "get-url", remote)
 	if err != nil {
-		return "", "", false
+		return "", nil, false
 	}
 	repo, ok = RepoOf(url)
 	if !ok {
-		return "", "", false
+		return "", nil, false
 	}
-	return repo, strings.TrimPrefix(remoteRef, "refs/heads/"), true
+	branches = []string{strings.TrimPrefix(remoteRef, "refs/heads/")}
+	if local := strings.TrimPrefix(ref, "refs/heads/"); local != branches[0] {
+		branches = append(branches, local)
+	}
+	return repo, branches, true
 }
 
 // headRef gives the local branch of HEAD, such as "refs/heads/fix". A rebase
@@ -103,7 +130,7 @@ func headRef(ctx context.Context, dir string) (string, bool) {
 			return "", false
 		}
 		if b, err := os.ReadFile(path); err == nil {
-			if ref := string(bytes.TrimSpace(b)); strings.HasPrefix(ref, "refs/heads/") {
+			if ref := strings.TrimSuffix(string(b), "\n"); strings.HasPrefix(ref, "refs/heads/") {
 				return ref, true
 			}
 		}
@@ -111,7 +138,9 @@ func headRef(ctx context.Context, dir string) (string, bool) {
 	return "", false
 }
 
+// gitOut runs git in dir and gives its output without the final newline. It
+// keeps the other bytes: a branch name can end with a non-ASCII space.
 func gitOut(ctx context.Context, dir string, args ...string) (string, error) {
 	out, err := exec.CommandContext(ctx, "git", append([]string{"-C", dir}, args...)...).Output()
-	return string(bytes.TrimSpace(out)), err
+	return strings.TrimSuffix(string(out), "\n"), err
 }

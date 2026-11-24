@@ -138,10 +138,10 @@ func TestBuildSessions(t *testing.T) {
 	}
 
 	secs := Build([]github.PR{p1, p2}, Options{Me: "me", Sessions: []claude.Session{
-		{Dir: "/w/1", Repo: "O/R", Branch: "sc-1/a"},
-		{Dir: "/w/2", Repo: "o/r", Branch: "sc-1/a"},
-		{Dir: "/w/3", Repo: "o/r", Branch: "B"},
-		{Dir: "/w/4", Repo: "o/x", Branch: "b"},
+		{Dir: "/w/1", Repo: "O/R", Branches: []string{"sc-1/a"}},
+		{Dir: "/w/2", Repo: "o/r", Branches: []string{"main", "sc-1/a"}},
+		{Dir: "/w/3", Repo: "o/r", Branches: []string{"B"}},
+		{Dir: "/w/4", Repo: "o/x", Branches: []string{"b"}},
 	}})
 	g, c := find(secs, 1)
 	if g != WIP || !reflect.DeepEqual(c.Labels, []string{"Claude"}) || !reflect.DeepEqual(c.Claude, []string{"/w/1", "/w/2"}) {
@@ -151,14 +151,21 @@ func TestBuildSessions(t *testing.T) {
 		t.Errorf("p2: group %s, Claude %q; want team, nil", g, c.Claude)
 	}
 
-	secs = Build([]github.PR{p2}, Options{Me: "me", Sessions: []claude.Session{{Dir: "/w/5", Repo: "o/r", Branch: "b"}}})
+	secs = Build([]github.PR{p2}, Options{Me: "me", Sessions: []claude.Session{{Dir: "/w/5", Repo: "o/r", Branches: []string{"b"}}}})
 	if g, c := find(secs, 2); g != Team || !reflect.DeepEqual(c.Claude, []string{"/w/5"}) {
 		t.Errorf("p2 with session: group %s, Claude %q; want team, [/w/5]", g, c.Claude)
 	}
 
+	// A CI-red PR keeps its label and gets the session directories.
+	red := pr(mine, requested("alice"), head("sc-1/a"), ci("FAILURE"), func(p *github.PR) { p.Number = 4 })
+	secs = Build([]github.PR{red}, Options{Me: "me", Sessions: []claude.Session{{Dir: "/w/7", Repo: "o/r", Branches: []string{"sc-1/a"}}}})
+	if g, c := find(secs, 4); g != WIP || !reflect.DeepEqual(c.Labels, []string{"CI red"}) || !reflect.DeepEqual(c.Claude, []string{"/w/7"}) {
+		t.Errorf("CI-red PR: group %s, card %+v", g, c)
+	}
+
 	// The head branch of a fork PR is in the fork, not in the repo of the session.
 	fork := pr(mine, requested("alice"), head("main"), func(p *github.PR) { p.Number = 3; p.Fork = true })
-	secs = Build([]github.PR{fork}, Options{Me: "me", Sessions: []claude.Session{{Dir: "/w/6", Repo: "o/r", Branch: "main"}}})
+	secs = Build([]github.PR{fork}, Options{Me: "me", Sessions: []claude.Session{{Dir: "/w/6", Repo: "o/r", Branches: []string{"main"}}}})
 	if g, c := find(secs, 3); g != Waiting || c.Claude != nil {
 		t.Errorf("fork PR: group %s, Claude %q; want waiting, nil", g, c.Claude)
 	}

@@ -22,8 +22,17 @@ func TestRepoOf(t *testing.T) {
 		{"ssh://git@github.com/o/r.git", "o/r", true},
 		{"https://github.com/o/r.git", "o/r", true},
 		{"https://github.com/o/r", "o/r", true},
+		{"https://user@github.com/o/r.git", "o/r", true},
+		{"https://github.com/o/r/", "o/r", true},
+		{"ssh://git@github.com:22/o/r.git", "o/r", true},
+		{"ssh://git@ssh.github.com:443/o/r.git", "o/r", true},
+		{"git@GitHub.com:o/r.git", "o/r", true},
+		{"https://GITHUB.COM/o/r", "o/r", true},
 		{"https://gitlab.com/o/r.git", "", false},
+		{"https://github.com.example.com/o/r", "", false},
 		{"git@github.com:o/r/x.git", "", false},
+		{"git@github.com:o", "", false},
+		{"https://github.com/o/.git", "", false},
 		{"/srv/git/r.git", "", false},
 	}
 	for _, c := range cases {
@@ -95,6 +104,11 @@ func TestFind(t *testing.T) {
 	git(t, c, "checkout", "-q", "--detach")
 	d := repo(t, "git@github.com:o/r.git", "y")
 	upstream(t, d, "y", ".", "main")
+	e := repo(t, "git@github.com:o/r.git", "z")
+	git(t, e, "remote", "add", "fork", "git@github.com:o/f.git")
+	upstream(t, e, "z", "fork", "z")
+	f := repo(t, "git@github.com:o/r.git", "w")
+	upstream(t, f, "w", "origin", "feature\u00a0")
 	plain := t.TempDir()
 	gone := filepath.Join(t.TempDir(), "gone")
 	if err := os.Mkdir(gone, 0o755); err != nil {
@@ -110,6 +124,8 @@ func TestFind(t *testing.T) {
 	process(t, proc, "16", "claude", plain)
 	process(t, proc, "17", "claude", gone)
 	process(t, proc, "18", "bash", a)
+	process(t, proc, "20", "claude", e)
+	process(t, proc, "21", "claude", f)
 	process(t, proc, "self", "claude", a)
 	process(t, proc, "19", "", a)
 	if err := os.Remove(gone); err != nil {
@@ -121,9 +137,11 @@ func TestFind(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []Session{
-		{Dir: a, Repo: "o/r", Branch: "sc-1234/fix"},
-		{Dir: sub, Repo: "o/r", Branch: "sc-1234/fix"},
-		{Dir: b, Repo: "o/r", Branch: "feat"},
+		{Dir: a, Repo: "o/r", Branches: []string{"sc-1234/fix", "fix"}},
+		{Dir: sub, Repo: "o/r", Branches: []string{"sc-1234/fix", "fix"}},
+		{Dir: b, Repo: "o/r", Branches: []string{"feat"}},
+		{Dir: e, Repo: "o/f", Branches: []string{"z"}},
+		{Dir: f, Repo: "o/r", Branches: []string{"feature\u00a0", "w"}},
 	}
 	slices.SortFunc(want, func(x, y Session) int { return strings.Compare(x.Dir, y.Dir) })
 	if !reflect.DeepEqual(got, want) {
@@ -170,7 +188,7 @@ func TestFindDuringRebase(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			want := []Session{{Dir: dir, Repo: "o/r", Branch: "sc-9/fix"}, {Dir: sub, Repo: "o/r", Branch: "sc-9/fix"}}
+			want := []Session{{Dir: dir, Repo: "o/r", Branches: []string{"sc-9/fix", "fix"}}, {Dir: sub, Repo: "o/r", Branches: []string{"sc-9/fix", "fix"}}}
 			if !reflect.DeepEqual(got, want) {
 				t.Fatalf("Find =\n%+v\nwant\n%+v", got, want)
 			}

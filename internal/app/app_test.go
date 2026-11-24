@@ -124,7 +124,9 @@ func TestLoadUsesSessions(t *testing.T) {
 	p.Author.Login = "me"
 	p.HeadRefName = "x"
 	p.RequestedUsers = []github.Actor{{Login: "alice"}}
-	sessions := func(context.Context) []claude.Session { return []claude.Session{{Dir: "/w", Repo: "o/a", Branch: "x"}} }
+	sessions := func(context.Context) []claude.Session {
+		return []claude.Session{{Dir: "/w", Repo: "o/a", Branches: []string{"x"}}}
+	}
 	b := Load(context.Background(), fake{"o/a": {p}}, sessions, "me", config.Config{Repos: []string{"o/a"}}, time.Now)
 	wip := b.Sections[1]
 	if wip.Group != board.WIP || len(wip.Cards) != 1 || len(wip.Cards[0].Claude) != 1 || wip.Cards[0].Claude[0] != "/w" {
