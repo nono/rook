@@ -24,8 +24,8 @@ type Client struct {
 	Endpoint string
 	Token    string
 	HTTP     *http.Client
-	// Me is the login of the user. OpenPRs reads all the reviews of Me, also
-	// the ones older than the last 100 reviews of the PR.
+	// Me is the login of the user. OpenPRs also reads the last 100 reviews
+	// of Me, which the last 100 reviews of the PR can miss.
 	Me string
 }
 
@@ -83,16 +83,9 @@ type gqlPR struct {
 			}
 		}
 	} `json:"reviewRequests"`
-	Reviews struct{ Nodes []gqlReview }
-	Mine    struct{ Nodes []gqlReview }
-	HeadRef *struct {
-		Target *struct{ StatusCheckRollup gqlRollup }
-	}
-	Commits struct {
-		Nodes []struct {
-			Commit struct{ StatusCheckRollup gqlRollup }
-		}
-	}
+	Reviews           struct{ Nodes []gqlReview }
+	Mine              struct{ Nodes []gqlReview }
+	StatusCheckRollup gqlRollup
 }
 
 func (g gqlPR) pr(repo string) PR {
@@ -105,13 +98,13 @@ func (g gqlPR) pr(repo string) PR {
 		r := n.RequestedReviewer
 		switch {
 		case r == nil:
-		case r.Typename == "Team":
+		case r.Typename == "Team" || r.Typename == "EnterpriseTeam":
 			p.RequestedTeams = append(p.RequestedTeams, r.Slug)
 		case r.Typename == "User":
 			p.RequestedUsers = append(p.RequestedUsers, r.actor())
 		}
 	}
-	// Mine holds all my reviews: the last 100 reviews of the PR can miss them.
+	// Mine holds my last 100 reviews: the last 100 reviews of the PR can miss them.
 	seen := map[string]bool{}
 	for _, n := range append(g.Reviews.Nodes, g.Mine.Nodes...) {
 		if n.State == "PENDING" || (n.ID != "" && seen[n.ID]) {
@@ -124,17 +117,10 @@ func (g gqlPR) pr(repo string) PR {
 		}
 		p.Reviews = append(p.Reviews, r)
 	}
-	// The head commit gives the CI state. commits(last: 1) is only a fallback
-	// when the head branch is gone: that connection stops at 250 commits.
-	var rollup gqlRollup
-	switch {
-	case g.HeadRef != nil && g.HeadRef.Target != nil:
-		rollup = g.HeadRef.Target.StatusCheckRollup
-	case len(g.Commits.Nodes) > 0:
-		rollup = g.Commits.Nodes[0].Commit.StatusCheckRollup
-	}
-	if rollup != nil {
-		p.CIState = rollup.State
+	// The rollup of the PR is the one of its head commit, also for a PR from
+	// a fork, with no cap on the number of commits.
+	if g.StatusCheckRollup != nil {
+		p.CIState = g.StatusCheckRollup.State
 	}
 	return p
 }

@@ -6,7 +6,7 @@ query($owner: String!, $name: String!, $cursor: String, $me: String) {
         number title url isDraft updatedAt headRefName headRefOid mergeable
         author { __typename login avatarUrl }
         reviewRequests(first: 100) {
-          nodes { requestedReviewer { __typename ... on User { login avatarUrl } ... on Team { slug } } }
+          nodes { requestedReviewer { __typename ... on User { login avatarUrl } ... on Team { slug } ... on EnterpriseTeam { slug } } }
         }
         reviews(last: 100) {
           nodes { id state submittedAt commit { oid } author { __typename login avatarUrl } }
@@ -14,8 +14,7 @@ query($owner: String!, $name: String!, $cursor: String, $me: String) {
         mine: reviews(author: $me, last: 100) {
           nodes { id state submittedAt commit { oid } author { __typename login avatarUrl } }
         }
-        headRef { target { ... on Commit { statusCheckRollup { state } } } }
-        commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
+        statusCheckRollup { state }
       }
     }
   }

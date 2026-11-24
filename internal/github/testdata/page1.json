@@ -17,6 +17,7 @@
             "reviewRequests": {"nodes": [
               {"requestedReviewer": {"__typename": "User", "login": "alice", "avatarUrl": "https://a/alice"}},
               {"requestedReviewer": {"__typename": "Team", "slug": "core"}},
+              {"requestedReviewer": {"__typename": "EnterpriseTeam", "slug": "ent"}},
               {"requestedReviewer": {"__typename": "Bot", "login": "copilot", "avatarUrl": "https://a/copilot"}},
               {"requestedReviewer": {"__typename": "Mannequin", "login": "old", "avatarUrl": "https://a/old"}},
               {"requestedReviewer": null}
@@ -31,8 +32,7 @@
               {"id": "r0", "state": "CHANGES_REQUESTED", "submittedAt": "2026-11-23T07:00:00Z", "commit": {"oid": "h9"}, "author": {"__typename": "User", "login": "me", "avatarUrl": "https://a/me"}},
               {"id": "r3", "state": "APPROVED", "submittedAt": "2026-11-24T07:30:00Z", "commit": null, "author": {"__typename": "User", "login": "carol", "avatarUrl": "https://a/carol"}}
             ]},
-            "headRef": {"target": {"oid": "h11", "statusCheckRollup": {"state": "FAILURE"}}},
-            "commits": {"nodes": [{"commit": {"statusCheckRollup": {"state": "SUCCESS"}}}]}
+            "statusCheckRollup": {"state": "FAILURE"}
           },
           {
             "number": 12,
@@ -49,8 +49,7 @@
               {"id": "r5", "state": "COMMENTED", "submittedAt": "2026-11-23T09:00:00Z", "commit": {"oid": "h12"}, "author": null}
             ]},
             "mine": {"nodes": []},
-            "headRef": {"target": {"oid": "h12", "statusCheckRollup": null}},
-            "commits": {"nodes": [{"commit": {"statusCheckRollup": null}}]}
+            "statusCheckRollup": null
           }
         ]
       }

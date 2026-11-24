@@ -41,6 +41,7 @@ func sampleBoard(title string) board.Board {
 		Reviewers: []board.Reviewer{
 			{Login: "bob", AvatarURL: "https://a/bob", State: board.Approved},
 			{Login: "carl", AvatarURL: "https://a/carl", State: board.Changes},
+			{Login: "dave", AvatarURL: "https://a/dave", State: board.Dismissed},
 			{Login: "core", Team: true, State: board.Requested},
 		},
 		UpdatedAt: now.Add(-2 * time.Hour),
@@ -86,7 +87,8 @@ func TestPageOrderAndContent(t *testing.T) {
 		"updated 2h ago", "alice", "https://a/bob", "bob: approved", "core",
 		"background:#ea580c",
 		`window.open(card.dataset.url, "_blank", "noopener")`,
-		"Data from 2026-11-24",
+		"Data from " + now.Local().Format("2006-01-02 15:04:05"),
+		"dave: review dismissed",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("body does not contain %q", want)

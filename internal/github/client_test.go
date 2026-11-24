@@ -105,7 +105,7 @@ func TestOpenPRsMapsFields(t *testing.T) {
 		HeadRefName: "me/sc-1-first", HeadOID: "h11", Mergeable: "MERGEABLE",
 		Author:         Actor{Login: "me", AvatarURL: "https://a/me"},
 		RequestedUsers: []Actor{{Login: "alice", AvatarURL: "https://a/alice"}},
-		RequestedTeams: []string{"core"},
+		RequestedTeams: []string{"core", "ent"},
 		Reviews: []Review{
 			{Author: Actor{Login: "rabbit", AvatarURL: "https://a/rabbit", Bot: true}, State: "COMMENTED",
 				SubmittedAt: time.Date(2026, 11, 24, 7, 0, 0, 0, time.UTC), CommitOID: "h10"},
@@ -125,10 +125,10 @@ func TestOpenPRsMapsFields(t *testing.T) {
 		t.Errorf("PR 12 = %+v", prs[1])
 	}
 	if prs[2].CIState != "PENDING" || prs[2].Mergeable != "CONFLICTING" {
-		t.Errorf("PR 13 (no headRef) = %+v", prs[2])
+		t.Errorf("PR 13 = %+v", prs[2])
 	}
 	if prs[3].CIState != "" {
-		t.Errorf("PR 14 (no headRef, no commits) = %+v", prs[3])
+		t.Errorf("PR 14 (no checks) = %+v", prs[3])
 	}
 }
 
