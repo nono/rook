@@ -20,7 +20,7 @@ var pageHTML string
 // Source gives the board to show. It is called at each page load.
 type Source func(ctx context.Context) board.Board
 
-var ciIcons = map[board.CI]string{board.CIGreen: "●", board.CIRed: "●", board.CIPending: "◐", board.CINone: "○"}
+var ciIcons = map[board.CI]string{board.CIGreen: "●", board.CIRed: "●", board.CIPending: "●", board.CINone: "○"}
 
 var stateWords = map[board.ReviewerState]string{
 	board.Approved:  "approved",
