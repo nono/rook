@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestRepoOf(t *testing.T) {
@@ -45,12 +46,45 @@ func TestRepoOf(t *testing.T) {
 
 func git(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
-	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null",
-		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com")
-	if out, err := cmd.CombinedOutput(); err != nil {
+	if out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput(); err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, out)
 	}
+}
+
+// isolate keeps the git calls of the test, and those of Find, away from the
+// git config of the user and from the GIT_DIR and the like of the environment.
+func isolate(t *testing.T) {
+	t.Helper()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not in PATH")
+	}
+	for _, v := range localEnv {
+		t.Setenv(v, "")
+		if err := os.Unsetenv(v); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for k, v := range map[string]string{
+		"GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_SYSTEM": "/dev/null",
+		"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.com",
+	} {
+		t.Setenv(k, v)
+	}
+}
+
+// fakeGit puts first in PATH a git that runs the sh script, then the real git.
+func fakeGit(t *testing.T, script string) {
+	t.Helper()
+	real, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	body := "#!/bin/sh\n" + script + "\nexec " + real + ` "$@"` + "\n"
+	if err := os.WriteFile(filepath.Join(dir, "git"), []byte(body), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 }
 
 // repo makes a git repo with one commit, the remote origin at url, and the local branch checked out.
@@ -88,9 +122,7 @@ func process(t *testing.T, proc, pid, comm, cwd string) {
 }
 
 func TestFind(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not in PATH")
-	}
+	isolate(t)
 	proc := t.TempDir()
 
 	a := repo(t, "git@github.com:o/r.git", "fix")
@@ -152,9 +184,7 @@ func TestFind(t *testing.T) {
 // A rebase that stops on a conflict detaches HEAD. The session stays on the
 // branch under rebase, with each rebase backend.
 func TestFindDuringRebase(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not in PATH")
-	}
+	isolate(t)
 	for _, backend := range []string{"--merge", "--apply"} {
 		t.Run(backend, func(t *testing.T) {
 			dir := repo(t, "git@github.com:o/r.git", "fix")
@@ -170,10 +200,7 @@ func TestFindDuringRebase(t *testing.T) {
 			git(t, dir, "checkout", "-q", "main")
 			write("main")
 			git(t, dir, "checkout", "-q", "fix")
-			cmd := exec.Command("git", "-C", dir, "rebase", backend, "main")
-			cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null",
-				"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com")
-			if err := cmd.Run(); err == nil {
+			if err := exec.Command("git", "-C", dir, "rebase", backend, "main").Run(); err == nil {
 				t.Fatal("rebase: want a conflict")
 			}
 			sub := filepath.Join(dir, "sub")
@@ -193,6 +220,67 @@ func TestFindDuringRebase(t *testing.T) {
 				t.Fatalf("Find =\n%+v\nwant\n%+v", got, want)
 			}
 		})
+	}
+}
+
+// one makes a fake /proc with one claude process in a repo on branch fix.
+func one(t *testing.T) (proc, dir string) {
+	t.Helper()
+	dir = repo(t, "git@github.com:o/r.git", "fix")
+	proc = t.TempDir()
+	process(t, proc, "10", "claude", dir)
+	return proc, dir
+}
+
+// A rebase can end between the read of HEAD and the read of the rebase
+// files. HEAD is then on the branch again.
+func TestFindRebaseEndsBetweenReads(t *testing.T) {
+	isolate(t)
+	proc, dir := one(t)
+	mark := filepath.Join(t.TempDir(), "mark")
+	fakeGit(t, `if [ "$3" = symbolic-ref ] && [ ! -e `+mark+` ]; then touch `+mark+`; exit 1; fi`)
+	got, err := Find(context.Background(), proc)
+	if want := []Session{{Dir: dir, Repo: "o/r", Branches: []string{"fix"}}}; err != nil || !reflect.DeepEqual(got, want) {
+		t.Fatalf("Find = %+v, %v; want %+v", got, err, want)
+	}
+}
+
+// A process that ends during the git calls is not a session.
+func TestFindProcessEndsDuringLookup(t *testing.T) {
+	isolate(t)
+	proc, _ := one(t)
+	fakeGit(t, "rm -rf "+filepath.Join(proc, "10"))
+	if got, err := Find(context.Background(), proc); err != nil || len(got) != 0 {
+		t.Fatalf("Find = %+v, %v; want none", got, err)
+	}
+}
+
+// GIT_DIR in the environment of rook must not replace the repo of the session.
+func TestFindIgnoresGitDir(t *testing.T) {
+	isolate(t)
+	proc, dir := one(t)
+	other := repo(t, "git@github.com:o/wrong.git", "unrelated")
+	t.Setenv("GIT_DIR", filepath.Join(other, ".git"))
+	got, err := Find(context.Background(), proc)
+	if want := []Session{{Dir: dir, Repo: "o/r", Branches: []string{"fix"}}}; err != nil || !reflect.DeepEqual(got, want) {
+		t.Fatalf("Find = %+v, %v; want %+v", got, err, want)
+	}
+}
+
+// A git that hangs, with a child that keeps its output open, must not hold
+// Find past the end of the context.
+func TestFindStopsSlowGit(t *testing.T) {
+	isolate(t)
+	proc, _ := one(t)
+	fakeGit(t, "sleep 5")
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	if got, err := Find(ctx, proc); err != nil || len(got) != 0 {
+		t.Fatalf("Find = %+v, %v; want none", got, err)
+	}
+	if d := time.Since(start); d > 2*time.Second {
+		t.Fatalf("Find took %s", d)
 	}
 }
 

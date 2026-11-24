@@ -40,7 +40,7 @@ For each cwd:
 2. Repo: the URL of that remote, as `owner/name`. Accept the scp-like form (`[user@]github.com:owner/name`) and the URLs (`ssh://`, `https://`), with a user, a port, a final `.git` or `/`, on the host `github.com` or `ssh.github.com`, in any case. Another host gives no match.
 3. Match: a PR matches when its repo is equal to the session's repo and its head branch is one of the session's branch names. The PR's repo is its current name (`nameWithOwner`): GitHub follows a rename, so a configured old name still gives the PRs, with the name that the remote of a new clone has. Repo names compare without case, branch names with case (git branch names depend on case).
 
-A cwd that is not in a git repo, a process that ends during the scan, or a git error: skip that process. If `/proc` cannot be read (not Linux), there are no sessions: log the error once at start, show no banner. The sessions never make the page fail.
+A cwd that is not in a git repo, a process that ends during the scan (also during its git calls), or a git error: skip that process. If a rebase ends between the read of `HEAD` and the read of the rebase files, read `HEAD` again. git runs without the variables of `git rev-parse --local-env-vars` (such as `GIT_DIR`), which would make it read another repo. If `/proc` cannot be read (not Linux), there are no sessions: log the error once at start, show no banner. The sessions never make the page fail.
 
 Two sessions can match the same PR: the card keeps all the directories.
 
