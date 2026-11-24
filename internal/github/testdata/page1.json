@@ -1,0 +1,48 @@
+{
+  "data": {
+    "repository": {
+      "pullRequests": {
+        "pageInfo": {"hasNextPage": true, "endCursor": "c1"},
+        "nodes": [
+          {
+            "number": 11,
+            "title": "[sc-1] First",
+            "url": "https://github.com/o/r/pull/11",
+            "isDraft": false,
+            "updatedAt": "2026-11-24T08:00:00Z",
+            "headRefName": "me/sc-1-first",
+            "headRefOid": "h11",
+            "mergeable": "MERGEABLE",
+            "author": {"__typename": "User", "login": "me", "avatarUrl": "https://a/me"},
+            "reviewRequests": {"nodes": [
+              {"requestedReviewer": {"__typename": "User", "login": "alice", "avatarUrl": "https://a/alice"}},
+              {"requestedReviewer": {"__typename": "Team", "slug": "core"}}
+            ]},
+            "reviews": {"nodes": [
+              {"state": "COMMENTED", "submittedAt": "2026-11-24T07:00:00Z", "commit": {"oid": "h10"}, "author": {"__typename": "Bot", "login": "rabbit", "avatarUrl": "https://a/rabbit"}},
+              {"state": "PENDING", "submittedAt": null, "commit": {"oid": "h11"}, "author": {"__typename": "User", "login": "bob", "avatarUrl": "https://a/bob"}},
+              {"state": "APPROVED", "submittedAt": "2026-11-24T07:30:00Z", "commit": null, "author": {"__typename": "User", "login": "carol", "avatarUrl": "https://a/carol"}}
+            ]},
+            "commits": {"nodes": [{"commit": {"statusCheckRollup": {"state": "SUCCESS"}}}]}
+          },
+          {
+            "number": 12,
+            "title": "Second",
+            "url": "https://github.com/o/r/pull/12",
+            "isDraft": true,
+            "updatedAt": "2026-11-23T08:00:00Z",
+            "headRefName": "second",
+            "headRefOid": "h12",
+            "mergeable": "UNKNOWN",
+            "author": null,
+            "reviewRequests": {"nodes": []},
+            "reviews": {"nodes": [
+              {"state": "COMMENTED", "submittedAt": "2026-11-23T09:00:00Z", "commit": {"oid": "h12"}, "author": null}
+            ]},
+            "commits": {"nodes": [{"commit": {"statusCheckRollup": null}}]}
+          }
+        ]
+      }
+    }
+  }
+}

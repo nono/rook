@@ -1,0 +1,25 @@
+{
+  "data": {
+    "repository": {
+      "pullRequests": {
+        "pageInfo": {"hasNextPage": false, "endCursor": "c2"},
+        "nodes": [
+          {
+            "number": 13,
+            "title": "Third",
+            "url": "https://github.com/o/r/pull/13",
+            "isDraft": false,
+            "updatedAt": "2026-11-22T08:00:00Z",
+            "headRefName": "third",
+            "headRefOid": "h13",
+            "mergeable": "CONFLICTING",
+            "author": {"__typename": "User", "login": "dave", "avatarUrl": "https://a/dave"},
+            "reviewRequests": {"nodes": []},
+            "reviews": {"nodes": []},
+            "commits": {"nodes": [{"commit": {"statusCheckRollup": {"state": "FAILURE"}}}]}
+          }
+        ]
+      }
+    }
+  }
+}
