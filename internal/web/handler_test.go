@@ -260,9 +260,28 @@ func TestClaudeLogo(t *testing.T) {
 	}
 	tag := body[i:]
 	tag = html.UnescapeString(tag[:strings.Index(tag, ">")])
-	for _, want := range []string{"Claude Code in /w/1", "Claude Code in /w/2"} {
-		if !strings.Contains(tag, want) {
-			t.Errorf("logo tag %q does not contain %q", tag, want)
+	if want := `title="Claude Code in /w/1` + "\n" + `Claude Code in /w/2"`; !strings.Contains(tag, want) {
+		t.Errorf("logo tag %q does not contain %q", tag, want)
+	}
+}
+
+// The logo shows in each group, not only in Review.
+func TestClaudeLogoInEachGroup(t *testing.T) {
+	b := sampleBoard("Do it")
+	card := b.Sections[0].Cards[0]
+	card.Claude = []string{"/w"}
+	for i := range b.Sections {
+		b.Sections[i].Cards = []board.Card{card}
+	}
+	_, body := get(t, b, http.MethodGet, "/")
+	for _, sec := range b.Sections {
+		start := strings.Index(body, `id="g-`+string(sec.Group)+`"`)
+		rest := body[start+1:]
+		if end := strings.Index(rest, `id="g-`); end >= 0 {
+			rest = rest[:end]
+		}
+		if !strings.Contains(rest, `class="claude"`) {
+			t.Errorf("group %s: no Claude logo", sec.Group)
 		}
 	}
 }
