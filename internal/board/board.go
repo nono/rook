@@ -241,7 +241,11 @@ func storyID(title, branch string) (id, cleanTitle string) {
 
 // sessionDirs gives the directories of the sessions on the repo and head branch
 // of the PR. GitHub repo names do not depend on case; git branch names do.
+// A fork PR has none: its head branch is not in the repo of the session.
 func sessionDirs(pr github.PR, sessions []claude.Session) []string {
+	if pr.Fork {
+		return nil
+	}
 	var dirs []string
 	for _, s := range sessions {
 		if strings.EqualFold(s.Repo, pr.Repo) && s.Branch == pr.HeadRefName {

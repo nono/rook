@@ -75,6 +75,7 @@ type gqlPR struct {
 	HeadRefOid  string
 	Mergeable   string
 	Author      *gqlActor
+	Fork        bool `json:"isCrossRepository"`
 	Requests    struct {
 		Nodes []struct {
 			RequestedReviewer *struct {
@@ -92,7 +93,7 @@ func (g gqlPR) pr(repo string) PR {
 	p := PR{
 		Repo: repo, Number: g.Number, Title: g.Title, URL: g.URL, IsDraft: g.IsDraft,
 		UpdatedAt: g.UpdatedAt, HeadRefName: g.HeadRefName, HeadOID: g.HeadRefOid,
-		Mergeable: g.Mergeable, Author: g.Author.actor(),
+		Mergeable: g.Mergeable, Author: g.Author.actor(), Fork: g.Fork,
 	}
 	for _, n := range g.Requests.Nodes {
 		r := n.RequestedReviewer

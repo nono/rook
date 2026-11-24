@@ -155,6 +155,13 @@ func TestBuildSessions(t *testing.T) {
 	if g, c := find(secs, 2); g != Team || !reflect.DeepEqual(c.Claude, []string{"/w/5"}) {
 		t.Errorf("p2 with session: group %s, Claude %q; want team, [/w/5]", g, c.Claude)
 	}
+
+	// The head branch of a fork PR is in the fork, not in the repo of the session.
+	fork := pr(mine, requested("alice"), head("main"), func(p *github.PR) { p.Number = 3; p.Fork = true })
+	secs = Build([]github.PR{fork}, Options{Me: "me", Sessions: []claude.Session{{Dir: "/w/6", Repo: "o/r", Branch: "main"}}})
+	if g, c := find(secs, 3); g != Waiting || c.Claude != nil {
+		t.Errorf("fork PR: group %s, Claude %q; want waiting, nil", g, c.Claude)
+	}
 }
 
 func TestCIOf(t *testing.T) {

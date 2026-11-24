@@ -24,7 +24,7 @@ func TestQueryAsksForMappedFields(t *testing.T) {
 		"repository.pullRequests.nodes.reviewRequests.nodes.requestedReviewer.EnterpriseTeam.slug",
 	}
 	for _, f := range []string{"number", "title", "url", "isDraft", "updatedAt", "headRefName", "headRefOid", "mergeable",
-		"author.__typename", "author.login", "author.avatarUrl"} {
+		"isCrossRepository", "author.__typename", "author.login", "author.avatarUrl"} {
 		want = append(want, "repository.pullRequests.nodes."+f)
 	}
 	for _, list := range []string{"reviews", "mine"} {

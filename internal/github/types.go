@@ -32,6 +32,7 @@ type PR struct {
 	UpdatedAt   time.Time
 	HeadRefName string
 	HeadOID     string
+	Fork        bool // the head branch is in another repo
 	// Mergeable is MERGEABLE, CONFLICTING or UNKNOWN.
 	Mergeable      string
 	Author         Actor

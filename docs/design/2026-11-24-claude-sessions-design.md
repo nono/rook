@@ -15,7 +15,7 @@ When I work on one of my PRs with Claude Code, the card stays in Waiting. The wo
 
 - Idle or active sessions. An open session is work in progress, idle or not. A later change can make this difference (Claude Code hooks can record the state, on top of this design).
 - Sessions on other machines, or other systems than Linux.
-- PRs from a fork: the worktree's upstream is the fork, which is not a configured repo, so the PR does not match.
+- PRs from a fork: a fork PR (`isCrossRepository`) never matches a session. Its head branch is in the fork, so a session on a branch of the same name in the base repo is not on that PR.
 
 ## Anti-goals
 
