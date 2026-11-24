@@ -48,7 +48,9 @@ func get(t *testing.T, b board.Board, method, path string) (int, string) {
 	t.Helper()
 	h := NewHandler(func(context.Context) board.Board { return b }, func() time.Time { return now })
 	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(method, path, nil))
+	req := httptest.NewRequest(method, path, nil)
+	req.Host = "127.0.0.1:7878"
+	h.ServeHTTP(rec, req)
 	body, _ := io.ReadAll(rec.Body)
 	return rec.Code, string(body)
 }
@@ -103,6 +105,26 @@ func TestPageEscapesTitle(t *testing.T) {
 	_, body := get(t, sampleBoard("<script>alert(1)</script>"), http.MethodGet, "/")
 	if strings.Contains(body, "<script>alert(1)") || !strings.Contains(body, "&lt;script&gt;") {
 		t.Fatal("title is not escaped")
+	}
+}
+
+// DNS rebinding: a page on another domain that resolves to 127.0.0.1 must not read the board.
+func TestRejectsForeignHost(t *testing.T) {
+	h := NewHandler(func(context.Context) board.Board { return sampleBoard("x") }, func() time.Time { return now })
+	for host, want := range map[string]int{
+		"evil.example:7878": http.StatusMisdirectedRequest,
+		"evil.example":      http.StatusMisdirectedRequest,
+		"127.0.0.1:7878":    http.StatusOK,
+		"localhost:7878":    http.StatusOK,
+		"[::1]:7878":        http.StatusOK,
+	} {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Host = host
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != want {
+			t.Errorf("Host %q: status %d, want %d", host, rec.Code, want)
+		}
 	}
 }
 

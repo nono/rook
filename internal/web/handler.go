@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/nono/rook/internal/board"
@@ -40,7 +42,21 @@ func Age(d time.Duration) string {
 	return fmt.Sprintf("%dm", int(d/time.Minute))
 }
 
-// NewHandler serves the page at "/".
+// loopbackHost tells if the Host header names this machine. Other names come
+// from DNS rebinding: a foreign page that resolves its own domain to 127.0.0.1.
+func loopbackHost(host string) bool {
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	host = strings.Trim(host, "[]")
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
+// NewHandler serves the page at "/" to loopback hosts only.
 func NewHandler(src Source, now func() time.Time) http.Handler {
 	tmpl := template.Must(template.New("page").Funcs(template.FuncMap{
 		"age":       func(t time.Time) string { return Age(now().Sub(t)) },
@@ -48,6 +64,10 @@ func NewHandler(src Source, now func() time.Time) http.Handler {
 		"stateWord": func(s board.ReviewerState) string { return stateWords[s] },
 	}).Parse(pageHTML))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !loopbackHost(r.Host) {
+			http.Error(w, "rook serves only loopback hosts", http.StatusMisdirectedRequest)
+			return
+		}
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)
 			return
