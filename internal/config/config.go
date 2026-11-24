@@ -59,11 +59,18 @@ func (c Config) check() error {
 	if len(c.Repos) == 0 {
 		return errors.New(`repos is empty: give at least one "owner/name"`)
 	}
+	seen := map[string]bool{}
 	for _, r := range c.Repos {
 		owner, name, ok := strings.Cut(r, "/")
 		if !ok || owner == "" || name == "" || strings.Contains(name, "/") {
 			return fmt.Errorf("repo %q: want \"owner/name\"", r)
 		}
+		// GitHub repo names do not depend on case.
+		key := strings.ToLower(r)
+		if seen[key] {
+			return fmt.Errorf("repo %q: listed twice", r)
+		}
+		seen[key] = true
 	}
 	host, _, err := net.SplitHostPort(c.Listen)
 	if err != nil {

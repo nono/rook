@@ -60,7 +60,11 @@ func TestLoadDefaultListen(t *testing.T) {
 }
 
 func TestLoadRejectsUnknownKey(t *testing.T) {
-	mustFail(t, `repo = ["a/b"]`, "repo")
+	mustFail(t, "repos = [\"a/b\"]\nrepo = [\"a/b\"]", "unknown keys: repo")
+}
+
+func TestLoadRejectsDuplicateRepo(t *testing.T) {
+	mustFail(t, `repos = ["o/a", "O/A"]`, `"O/A"`)
 }
 
 func TestLoadRejectsNoRepos(t *testing.T) {
