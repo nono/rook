@@ -82,8 +82,12 @@ func TestLoadOptions(t *testing.T) {
 	p.Reviews = []github.Review{{Author: github.Actor{Login: "rabbit"}, State: "COMMENTED"}}
 	cfg := config.Config{Repos: []string{"o/a"}, ShortcutWorkspace: "ws", IgnoreReviewers: []string{"rabbit"}}
 	c := cards(Load(context.Background(), fake{"o/a": {p}}, "me", cfg, time.Now))[0]
-	if c.StoryURL != "https://app.shortcut.com/ws/story/5" || len(c.Reviewers) != 0 {
+	if c.StoryURL != "https://app.shortcut.com/ws/story/5" || len(c.Reviewers) != 0 || c.Mine {
 		t.Fatalf("card = %+v", c)
+	}
+	p.Author.Login = "me"
+	if c := cards(Load(context.Background(), fake{"o/a": {p}}, "me", cfg, time.Now))[0]; !c.Mine {
+		t.Fatalf("my PR: card = %+v", c)
 	}
 }
 

@@ -3,11 +3,11 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -25,8 +25,9 @@ import (
 
 const usage = "usage: rook serve [--config PATH]"
 
-// loadTimeout limits the GitHub calls of one page load.
-const loadTimeout = 20 * time.Second
+// loadTimeout limits the GitHub calls of one page load. A repo that is slower
+// gets an error banner, and the page shows the other repos.
+const loadTimeout = 8 * time.Second
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -80,10 +81,24 @@ func serve(ctx context.Context, cfgPath string) error {
 		defer cancel()
 		return app.Load(ctx, client, me, cfg, time.Now)
 	}
-	srv := &http.Server{Addr: cfg.Listen, Handler: web.NewHandler(src, time.Now), ReadHeaderTimeout: 5 * time.Second}
+	ln, err := net.Listen("tcp", cfg.Listen)
+	if err != nil {
+		return err
+	}
+	log.Printf("rook: http://%s/ (user %s)", ln.Addr(), me)
+	return serveHTTP(ctx, ln, web.NewHandler(src, time.Now))
+}
+
+// serveHTTP serves h on ln until ctx ends. The end of ctx also cancels the
+// page loads in progress, so that the stop does not wait for GitHub.
+func serveHTTP(ctx context.Context, ln net.Listener, h http.Handler) error {
+	srv := &http.Server{
+		Handler:           h,
+		ReadHeaderTimeout: 5 * time.Second,
+		BaseContext:       func(net.Listener) context.Context { return ctx },
+	}
 	errc := make(chan error, 1)
-	go func() { errc <- srv.ListenAndServe() }()
-	log.Printf("rook: http://%s/ (user %s)", cfg.Listen, me)
+	go func() { errc <- srv.Serve(ln) }()
 	select {
 	case err := <-errc:
 		return err
@@ -91,14 +106,11 @@ func serve(ctx context.Context, cfgPath string) error {
 	}
 	shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := srv.Shutdown(shutdown); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		return err
-	}
-	return nil
+	return srv.Shutdown(shutdown)
 }
 
 func ghToken(ctx context.Context) (string, error) {
-	out, err := exec.CommandContext(ctx, "gh", "auth", "token").Output()
+	out, err := exec.CommandContext(ctx, "gh", "auth", "token", "--hostname", "github.com").Output()
 	token := strings.TrimSpace(string(out))
 	if err != nil || token == "" {
 		return "", fmt.Errorf(`no GitHub token: run "gh auth login" first (%v)`, err)
