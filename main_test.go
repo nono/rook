@@ -80,7 +80,11 @@ func TestServeHTTPStopsDuringLoad(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() { done <- serveHTTP(ctx, ln, h) }()
-	go func() { _, _ = http.Get("http://" + ln.Addr().String() + "/") }()
+	go func() {
+		if resp, err := http.Get("http://" + ln.Addr().String() + "/"); err == nil {
+			_ = resp.Body.Close()
+		}
+	}()
 	<-started
 	cancel()
 	select {

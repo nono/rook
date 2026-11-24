@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -39,8 +40,9 @@ const loadTimeout = 8 * time.Second
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-	os.Exit(run(ctx, os.Args[1:], os.Stderr))
+	code := run(ctx, os.Args[1:], os.Stderr)
+	stop()
+	os.Exit(code)
 }
 
 func run(ctx context.Context, args []string, stderr io.Writer) int {
@@ -145,8 +147,11 @@ func serveHTTP(ctx context.Context, ln net.Listener, h http.Handler) error {
 func ghToken(ctx context.Context) (string, error) {
 	out, err := exec.CommandContext(ctx, "gh", "auth", "token", "--hostname", "github.com").Output()
 	token := strings.TrimSpace(string(out))
-	if err != nil || token == "" {
-		return "", fmt.Errorf(`no GitHub token from "gh auth token": install gh and run "gh auth login" (%v)`, err)
+	if err != nil {
+		return "", fmt.Errorf(`no GitHub token from "gh auth token": install gh and run "gh auth login" (%w)`, err)
+	}
+	if token == "" {
+		return "", errors.New(`no GitHub token from "gh auth token": run "gh auth login"`)
 	}
 	return token, nil
 }

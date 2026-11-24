@@ -258,8 +258,8 @@ func TestClaudeLogo(t *testing.T) {
 	if ci := strings.Index(body, `class="ci `); ci < 0 || i < ci {
 		t.Errorf("logo at %d, before the CI dot at %d", i, ci)
 	}
-	tag := body[i:]
-	tag = html.UnescapeString(tag[:strings.Index(tag, ">")])
+	tag, _, _ := strings.Cut(body[i:], ">")
+	tag = html.UnescapeString(tag)
 	if want := `title="Claude Code in /w/1` + "\n" + `Claude Code in /w/2"`; !strings.Contains(tag, want) {
 		t.Errorf("logo tag %q does not contain %q", tag, want)
 	}

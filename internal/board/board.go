@@ -164,6 +164,7 @@ func classify(pr github.PR, opts Options, session bool) (Group, string) {
 		return Team, ""
 	}
 	switch ciOf(pr.CIState) {
+	case CIGreen, CINone:
 	case CIRed:
 		return WIP, "CI red"
 	case CIPending:
