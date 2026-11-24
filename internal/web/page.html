@@ -48,6 +48,7 @@
   .avw.commented .av { outline: 2px solid #cbd5e1; }
   .avw.approved .av { outline: 2px solid #16a34a; }
   .avw.changes .av { outline: 2px solid #dc2626; }
+  .avw.dismissed .av { opacity: .6; outline: 2px dotted #cbd5e1; }
   .mk { position: absolute; right: -4px; bottom: -3px; width: 12px; height: 12px; border-radius: 50%; font-size: 9px; line-height: 12px; text-align: center; color: #fff; font-weight: 700; }
   .mk.ok { background: #16a34a; } .mk.ko { background: #dc2626; }
   .team { font-size: 11px; color: #6b7280; background: #f3f4f6; border: 1px dashed #9ca3af; border-radius: 9px; padding: 0 6px; line-height: 18px; }
@@ -62,28 +63,28 @@
 {{range .Errors}}<div class="err">{{.Repo}}: {{.Err}}</div>
 {{end}}
 {{range .Sections}}
+{{- $g := group .Group}}
 <section id="g-{{.Group}}">
-  <div class="hc"><span class="name">{{.Name}}</span><span class="cnt" style="background:{{.Color}}">{{len .Cards}}</span><span class="hint">{{.Hint}}</span></div>
+  <div class="hc"><span class="name">{{$g.Name}}</span><span class="cnt" style="background:{{$g.Color}}">{{len .Cards}}</span><span class="hint">{{$g.Hint}}</span></div>
   <div class="wrap">
-  {{- $color := .Color}}
   {{- range .Cards}}
     <div class="card" data-url="{{.URL}}">
-      <div class="strip" style="background:{{$color}}"></div>
+      <div class="strip" style="background:{{$g.Color}}"></div>
       <div class="inner">
-        {{- if .ShowRepo}}<div class="repo">{{.Repo}}</div>{{end}}
+        {{- if $.ShowRepo}}<div class="repo">{{.Repo}}</div>{{end}}
         <a class="t" href="{{.URL}}" target="_blank" rel="noopener">{{.Title}}</a>
-        <div class="labels">{{range .Labels}}<span class="lab {{.Tone}}">{{.Text}}</span>{{end}}</div>
+        <div class="labels">{{range .Labels}}<span class="lab {{tone .}}">{{.}}</span>{{end}}</div>
         <div class="foot">
           {{- if .StoryURL}}<a class="scid" href="{{.StoryURL}}" target="_blank" rel="noopener">sc-{{.StoryID}}</a>
           {{- else if .StoryID}}<span class="scid">sc-{{.StoryID}}</span>{{end}}
           <span class="num">#{{.Number}}</span>
-          <span class="ci {{.CI}}" title="CI {{.CI}}">{{ciIcon .CI}}</span>
+          <span class="ci {{.CI}}" title="CI {{.CI}}">{{if eq .CI "none"}}○{{else}}●{{end}}</span>
           <span class="sp"></span>
           <span class="avs">
           {{- range .Reviewers}}
             {{- if .Team}}<span class="team" title="{{.Login}}: review requested">{{.Login}}</span>
             {{- else}}<span class="avw {{.State}}" title="{{.Login}}: {{stateWord .State}}"><img class="av" width="22" height="22" src="{{.AvatarURL}}" alt="{{.Login}}">
-              {{- if eq (print .State) "approved"}}<span class="mk ok">✓</span>{{else if eq (print .State) "changes"}}<span class="mk ko">✗</span>{{end}}</span>
+              {{- if eq .State "approved"}}<span class="mk ok">✓</span>{{else if eq .State "changes"}}<span class="mk ko">✗</span>{{end}}</span>
             {{- end}}
           {{- end}}
           </span>

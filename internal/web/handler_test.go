@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"html/template"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -15,7 +16,7 @@ import (
 
 var now = time.Date(2026, 11, 24, 10, 0, 0, 0, time.UTC)
 
-func TestAge(t *testing.T) {
+func TestShortAge(t *testing.T) {
 	for d, want := range map[time.Duration]string{
 		30 * time.Second:             "0m",
 		5 * time.Minute:              "5m",
@@ -24,8 +25,8 @@ func TestAge(t *testing.T) {
 		-5 * time.Minute:             "0m",
 		-3 * time.Hour:               "0m",
 	} {
-		if got := Age(d); got != want {
-			t.Errorf("Age(%s) = %q, want %q", d, got, want)
+		if got := shortAge(d); got != want {
+			t.Errorf("shortAge(%s) = %q, want %q", d, got, want)
 		}
 	}
 }
@@ -34,11 +35,12 @@ func sampleBoard(title string) board.Board {
 	secs := board.Build(nil, board.Options{})
 	secs[0].Cards = []board.Card{{
 		Kind: "pr", Repo: "o/r", Number: 1, Title: title, URL: "https://github.com/o/r/pull/1",
-		StoryID: "9", StoryURL: "https://app.shortcut.com/ws/story/9", Group: board.Review,
-		Labels: []board.Label{{Text: "not reviewed", Tone: "gry"}, {Text: "draft", Tone: "gry"}},
-		CI:     board.CIGreen, Author: github.Actor{Login: "alice", AvatarURL: "https://a/alice"},
+		StoryID: "9", StoryURL: "https://app.shortcut.com/ws/story/9",
+		Labels: []string{"no reviewer", "draft"},
+		CI:     board.CINone, Author: github.Actor{Login: "alice", AvatarURL: "https://a/alice"},
 		Reviewers: []board.Reviewer{
 			{Login: "bob", AvatarURL: "https://a/bob", State: board.Approved},
+			{Login: "carl", AvatarURL: "https://a/carl", State: board.Changes},
 			{Login: "core", Team: true, State: board.Requested},
 		},
 		UpdatedAt: now.Add(-2 * time.Hour),
@@ -58,23 +60,29 @@ func get(t *testing.T, b board.Board, method, path string) (int, string) {
 }
 
 func TestPageOrderAndContent(t *testing.T) {
-	code, body := get(t, sampleBoard("Do it"), http.MethodGet, "/")
+	b := sampleBoard("Do it")
+	code, body := get(t, b, http.MethodGet, "/")
 	if code != 200 {
 		t.Fatalf("status = %d", code)
 	}
 	last := -1
-	for _, g := range board.Order {
+	for _, sec := range b.Sections {
+		g := sec.Group
 		i := strings.Index(body, `id="g-`+string(g)+`"`)
 		if i < 0 || i < last {
 			t.Fatalf("section %s at %d, previous at %d", g, i, last)
 		}
 		last = i
 	}
+	if strings.Contains(body, `class="repo"`) {
+		t.Error("one repo: the card must not show the repo name")
+	}
 	for _, want := range []string{
 		`href="https://app.shortcut.com/ws/story/9"`,
 		`data-url="https://github.com/o/r/pull/1"`,
 		"nothing", "o/x: boom", "Refresh", "your turn to review",
-		"not reviewed", "draft", "stopPropagation", "Do it",
+		`<span class="lab ylw">no reviewer</span>`, `<span class="lab gry">draft</span>`, "stopPropagation", "Do it",
+		`<span class="mk ok">✓</span>`, `<span class="mk ko">✗</span>`, `title="CI none">○<`, "carl: requested changes",
 		"updated 2h ago", "alice", "https://a/bob", "bob: approved", "core",
 		"background:#ea580c",
 		`window.open(card.dataset.url, "_blank", "noopener")`,
@@ -98,7 +106,7 @@ func TestPageStoryWithoutURL(t *testing.T) {
 func TestPageMine(t *testing.T) {
 	b := sampleBoard("Do it")
 	b.Sections[0].Cards[0].Mine = true
-	b.Sections[0].Cards[0].ShowRepo = true
+	b.ShowRepo = true
 	_, body := get(t, b, http.MethodGet, "/")
 	if !strings.Contains(body, "mine") || !strings.Contains(body, `<div class="repo">o/r</div>`) {
 		t.Fatal("mine card should say mine and show the repo")
@@ -164,5 +172,45 @@ func TestAvatarsWrap(t *testing.T) {
 	rule := pageHTML[i : i+strings.Index(pageHTML[i:], "}")]
 	if !strings.Contains(rule, "flex-wrap: wrap") {
 		t.Fatalf(".avs rule = %q, want flex-wrap: wrap", rule)
+	}
+}
+
+func TestHead(t *testing.T) {
+	if code, _ := get(t, sampleBoard("x"), http.MethodHead, "/"); code != http.StatusOK {
+		t.Fatalf("HEAD / status = %d, want 200", code)
+	}
+}
+
+func TestEveryGroupHasStyle(t *testing.T) {
+	for _, s := range board.Build(nil, board.Options{}) {
+		if st := groupStyles[s.Group]; st.Name == "" || st.Hint == "" || st.Color == "" {
+			t.Errorf("group %s has no style", s.Group)
+		}
+	}
+	want := map[board.Group]groupStyle{
+		board.Review:   {"Review", "your turn to review", "#ea580c"},
+		board.WIP:      {"WIP", "your turn to fix", "#ca8a04"},
+		board.Conflict: {"Conflict", "rebase needed", "#dc2626"},
+		board.Waiting:  {"Waiting", "others' turn", "#2563eb"},
+		board.Team:     {"Team", "FYI", "#6b7280"},
+	}
+	for g, w := range want {
+		if groupStyles[g] != w {
+			t.Errorf("style of %s = %+v, want %+v", g, groupStyles[g], w)
+		}
+	}
+}
+
+func TestLabelTones(t *testing.T) {
+	for label, want := range map[string]string{
+		"CI red": "red", "conflict": "red", "CI pending": "ylw", "no reviewer": "ylw",
+		"not reviewed": "gry", "requested again": "gry", "new commits": "gry", "draft": "gry", "merge ?": "gry",
+	} {
+		b := sampleBoard("x")
+		b.Sections[0].Cards[0].Labels = []string{label}
+		_, body := get(t, b, http.MethodGet, "/")
+		if !strings.Contains(body, `<span class="lab `+want+`">`+template.HTMLEscapeString(label)+`</span>`) {
+			t.Errorf("label %q: want tone %s", label, want)
+		}
 	}
 }

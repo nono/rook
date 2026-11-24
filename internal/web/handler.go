@@ -3,6 +3,7 @@ package web
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	_ "embed"
 	"fmt"
@@ -10,10 +11,10 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/nono/rook/internal/board"
+	"github.com/nono/rook/internal/loopback"
 )
 
 //go:embed page.html
@@ -22,18 +23,30 @@ var pageHTML string
 // Source gives the board to show. It is called at each page load.
 type Source func(ctx context.Context) board.Board
 
-var ciIcons = map[board.CI]string{board.CIGreen: "●", board.CIRed: "●", board.CIPending: "●", board.CINone: "○"}
+type groupStyle struct{ Name, Hint, Color string }
+
+var groupStyles = map[board.Group]groupStyle{
+	board.Review:   {"Review", "your turn to review", "#ea580c"},
+	board.WIP:      {"WIP", "your turn to fix", "#ca8a04"},
+	board.Conflict: {"Conflict", "rebase needed", "#dc2626"},
+	board.Waiting:  {"Waiting", "others' turn", "#2563eb"},
+	board.Team:     {"Team", "FYI", "#6b7280"},
+}
+
+// labelTones gives the CSS class of a label; the other labels are gray.
+var labelTones = map[string]string{"CI red": "red", "conflict": "red", "CI pending": "ylw", "no reviewer": "ylw"}
 
 var stateWords = map[board.ReviewerState]string{
 	board.Approved:  "approved",
 	board.Changes:   "requested changes",
 	board.Commented: "commented",
+	board.Dismissed: "review dismissed",
 	board.Requested: "review requested",
 }
 
-// Age gives a short form of d: "5m", "3h", "2d". A negative d (a local clock
-// behind GitHub's) gives "0m".
-func Age(d time.Duration) string {
+// shortAge gives a short form of d: "5m", "3h", "2d". A negative d (a local
+// clock behind GitHub's) gives "0m".
+func shortAge(d time.Duration) string {
 	switch {
 	case d >= 24*time.Hour:
 		return fmt.Sprintf("%dd", int(d/(24*time.Hour)))
@@ -50,19 +63,15 @@ func loopbackHost(host string) bool {
 	if h, _, err := net.SplitHostPort(host); err == nil {
 		host = h
 	}
-	host = strings.Trim(host, "[]")
-	if host == "localhost" {
-		return true
-	}
-	ip := net.ParseIP(host)
-	return ip != nil && ip.IsLoopback()
+	return loopback.Host(host)
 }
 
 // NewHandler serves the page at "/" to loopback hosts only.
 func NewHandler(src Source, now func() time.Time) http.Handler {
 	tmpl := template.Must(template.New("page").Funcs(template.FuncMap{
-		"age":       func(t time.Time) string { return Age(now().Sub(t)) },
-		"ciIcon":    func(c board.CI) string { return ciIcons[c] },
+		"age":       func(t time.Time) string { return shortAge(now().Sub(t)) },
+		"group":     func(g board.Group) groupStyle { return groupStyles[g] },
+		"tone":      func(label string) string { return cmp.Or(labelTones[label], "gry") },
 		"stateWord": func(s board.ReviewerState) string { return stateWords[s] },
 	}).Parse(pageHTML))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

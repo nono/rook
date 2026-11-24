@@ -10,10 +10,12 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+
+	"github.com/nono/rook/internal/loopback"
 )
 
-// DefaultListen is the address used when the config has no listen key.
-const DefaultListen = "127.0.0.1:7878"
+// defaultListen is the address used when the config has no listen key.
+const defaultListen = "127.0.0.1:7878"
 
 // Config is the content of the config file.
 type Config struct {
@@ -47,7 +49,7 @@ func Load(path string) (Config, error) {
 		return Config{}, fmt.Errorf("config %s: unknown keys: %s", path, strings.Join(keys, ", "))
 	}
 	if cfg.Listen == "" {
-		cfg.Listen = DefaultListen
+		cfg.Listen = defaultListen
 	}
 	if err := cfg.check(); err != nil {
 		return Config{}, fmt.Errorf("config %s: %w", path, err)
@@ -76,7 +78,7 @@ func (c Config) check() error {
 	if err != nil {
 		return fmt.Errorf("listen %q: %w", c.Listen, err)
 	}
-	if ip := net.ParseIP(host); host != "localhost" && (ip == nil || !ip.IsLoopback()) {
+	if !loopback.Host(host) {
 		return fmt.Errorf("listen %q: the host must be a loopback address", c.Listen)
 	}
 	return nil

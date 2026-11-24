@@ -14,7 +14,7 @@ import (
 // Group is a row of the dashboard.
 type Group string
 
-// The groups, see Order for the display order.
+// The groups, in display order.
 const (
 	Review   Group = "review"
 	WIP      Group = "wip"
@@ -23,16 +23,7 @@ const (
 	Team     Group = "team"
 )
 
-// Order is the display order of the groups.
-var Order = []Group{Review, WIP, Conflict, Waiting, Team}
-
-var groupInfo = map[Group]struct{ name, hint, color string }{
-	Review:   {"Review", "your turn to review", "#ea580c"},
-	WIP:      {"WIP", "your turn to fix", "#ca8a04"},
-	Conflict: {"Conflict", "rebase needed", "#dc2626"},
-	Waiting:  {"Waiting", "others' turn", "#2563eb"},
-	Team:     {"Team", "FYI", "#6b7280"},
-}
+var order = []Group{Review, WIP, Conflict, Waiting, Team}
 
 // CI is the state of the checks of a PR.
 type CI string
@@ -53,6 +44,7 @@ const (
 	Approved  ReviewerState = "approved"
 	Changes   ReviewerState = "changes"
 	Commented ReviewerState = "commented"
+	Dismissed ReviewerState = "dismissed"
 	Requested ReviewerState = "requested"
 )
 
@@ -64,24 +56,16 @@ type Reviewer struct {
 	State     ReviewerState
 }
 
-// Label is a small tag on a card. Tone is "red", "ylw" or "gry".
-type Label struct {
-	Text string
-	Tone string
-}
-
 // Card is one item of the dashboard.
 type Card struct {
 	Kind      string // "pr"; step 2 adds "story"
 	Repo      string
-	ShowRepo  bool
 	Number    int
 	Title     string // without the [sc-NNNN] prefix
 	URL       string
 	StoryID   string // "" when none
 	StoryURL  string // "" when no ID or no workspace
-	Group     Group
-	Labels    []Label
+	Labels    []string
 	CI        CI
 	Author    github.Actor
 	Mine      bool
@@ -92,9 +76,6 @@ type Card struct {
 // Section is a group with its cards.
 type Section struct {
 	Group Group
-	Name  string
-	Hint  string
-	Color string
 	Cards []Card
 }
 
@@ -109,6 +90,7 @@ type Board struct {
 	Sections  []Section
 	Errors    []RepoError
 	FetchedAt time.Time
+	ShowRepo  bool // more than one repo: each card shows its repo
 }
 
 // Options are the inputs of the rules other than the PRs.
@@ -116,11 +98,11 @@ type Options struct {
 	Me                string
 	ShortcutWorkspace string
 	Ignore            []string
-	ShowRepo          bool
 }
 
-// CIOf maps a statusCheckRollup state to a CI state.
-func CIOf(state string) CI {
+// ciOf maps a statusCheckRollup state to a CI state. An unknown state is
+// pending, so that a new state cannot hide a broken PR.
+func ciOf(state string) CI {
 	switch state {
 	case "SUCCESS":
 		return CIGreen
@@ -144,48 +126,39 @@ func human(a github.Actor, pr github.PR, opts Options) bool {
 	return person(a, opts) && a.Login != pr.Author.Login
 }
 
-// sortedReviews gives the reviews of login, oldest first.
-func sortedReviews(pr github.PR, login string) []github.Review {
-	var out []github.Review
-	for _, r := range pr.Reviews {
-		if r.Author.Login == login {
-			out = append(out, r)
-		}
-	}
+// sortedReviews gives the reviews of the PR, oldest first.
+func sortedReviews(pr github.PR) []github.Review {
+	out := slices.Clone(pr.Reviews)
 	slices.SortStableFunc(out, func(a, b github.Review) int { return a.SubmittedAt.Compare(b.SubmittedAt) })
 	return out
 }
 
-// verdict gives the state of the last APPROVED or CHANGES_REQUESTED review, "" if none.
-func verdict(rs []github.Review) string {
-	for i := len(rs) - 1; i >= 0; i-- {
-		if rs[i].State == "APPROVED" || rs[i].State == "CHANGES_REQUESTED" {
-			return rs[i].State
-		}
-	}
-	return ""
-}
-
-func requestedUser(pr github.PR, login string) bool {
-	return slices.ContainsFunc(pr.RequestedUsers, func(a github.Actor) bool { return a.Login == login })
-}
-
-// Classify gives the group of a PR and the reason label ("" for team and waiting).
-func Classify(pr github.PR, opts Options) (Group, string) {
+// classify gives the group of a PR and the reason label ("" for team and waiting).
+func classify(pr github.PR, opts Options) (Group, string) {
 	if pr.Author.Login != opts.Me {
-		mine := sortedReviews(pr, opts.Me)
-		if requestedUser(pr, opts.Me) {
-			if len(mine) == 0 {
+		var last *github.Review
+		verdict := ""
+		for _, r := range sortedReviews(pr) {
+			if r.Author.Login != opts.Me {
+				continue
+			}
+			last = &r
+			if r.State == "APPROVED" || r.State == "CHANGES_REQUESTED" {
+				verdict = r.State
+			}
+		}
+		if slices.ContainsFunc(pr.RequestedUsers, func(a github.Actor) bool { return a.Login == opts.Me }) {
+			if last == nil {
 				return Review, "not reviewed"
 			}
 			return Review, "requested again"
 		}
-		if len(mine) > 0 && verdict(mine) != "APPROVED" && mine[len(mine)-1].CommitOID != pr.HeadOID {
+		if last != nil && verdict != "APPROVED" && last.CommitOID != pr.HeadOID {
 			return Review, "new commits"
 		}
 		return Team, ""
 	}
-	switch CIOf(pr.CIState) {
+	switch ciOf(pr.CIState) {
 	case CIRed:
 		return WIP, "CI red"
 	case CIPending:
@@ -203,39 +176,38 @@ func Classify(pr github.PR, opts Options) (Group, string) {
 	return Waiting, ""
 }
 
-// Reviewers gives the human reviewers of a PR, in order of first review, then the requested ones.
-func Reviewers(pr github.PR, opts Options) []Reviewer {
-	all := slices.Clone(pr.Reviews)
-	slices.SortStableFunc(all, func(a, b github.Review) int { return a.SubmittedAt.Compare(b.SubmittedAt) })
+// reviewers gives the human reviewers of a PR, in order of first review, then the requested ones.
+// The state is the reviewer's verdict, else "commented", else "dismissed"; a pending request wins.
+func reviewers(pr github.PR, opts Options) []Reviewer {
 	var out []Reviewer
 	index := map[string]int{}
-	for _, r := range all {
+	add := func(a github.Actor) int {
+		i, ok := index[a.Login]
+		if !ok {
+			i = len(out)
+			index[a.Login] = i
+			out = append(out, Reviewer{Login: a.Login, AvatarURL: a.AvatarURL, State: Dismissed})
+		}
+		return i
+	}
+	for _, r := range sortedReviews(pr) {
 		if !human(r.Author, pr, opts) {
 			continue
 		}
-		if _, ok := index[r.Author.Login]; ok {
-			continue
+		i := add(r.Author)
+		switch {
+		case r.State == "APPROVED":
+			out[i].State = Approved
+		case r.State == "CHANGES_REQUESTED":
+			out[i].State = Changes
+		case r.State == "COMMENTED" && out[i].State == Dismissed:
+			out[i].State = Commented
 		}
-		index[r.Author.Login] = len(out)
-		state := Commented
-		switch verdict(sortedReviews(pr, r.Author.Login)) {
-		case "APPROVED":
-			state = Approved
-		case "CHANGES_REQUESTED":
-			state = Changes
-		}
-		out = append(out, Reviewer{Login: r.Author.Login, AvatarURL: r.Author.AvatarURL, State: state})
 	}
 	for _, u := range pr.RequestedUsers {
-		if i, ok := index[u.Login]; ok {
-			out[i].State = Requested
-			continue
+		if human(u, pr, opts) {
+			out[add(u)].State = Requested
 		}
-		if !person(u, opts) {
-			continue
-		}
-		index[u.Login] = len(out)
-		out = append(out, Reviewer{Login: u.Login, AvatarURL: u.AvatarURL, State: Requested})
 	}
 	for _, t := range pr.RequestedTeams {
 		out = append(out, Reviewer{Login: t, Team: true, State: Requested})
@@ -248,9 +220,9 @@ var (
 	branchStory = regexp.MustCompile(`(?i)(?:^|[^a-z0-9])sc-(\d+)`)
 )
 
-// StoryID finds the Shortcut story of a PR in its title prefix, else in its branch name.
+// storyID finds the Shortcut story of a PR in its title prefix, else in its branch name.
 // cleanTitle is the title without the prefix.
-func StoryID(title, branch string) (id, cleanTitle string) {
+func storyID(title, branch string) (id, cleanTitle string) {
 	if m := titleStory.FindStringSubmatch(title); m != nil {
 		return m[1], title[len(m[0]):]
 	}
@@ -260,42 +232,39 @@ func StoryID(title, branch string) (id, cleanTitle string) {
 	return "", title
 }
 
-var reasonTone = map[string]string{"CI red": "red", "conflict": "red", "CI pending": "ylw", "no reviewer": "ylw"}
-
-// Build sorts the PRs into the five sections, in Order, newest first in each.
+// Build sorts the PRs into the five sections, in display order, newest first in each.
 func Build(prs []github.PR, opts Options) []Section {
 	byGroup := map[Group][]Card{}
 	for _, pr := range prs {
-		g, reason := Classify(pr, opts)
-		id, title := StoryID(pr.Title, pr.HeadRefName)
+		g, reason := classify(pr, opts)
+		id, title := storyID(pr.Title, pr.HeadRefName)
 		c := Card{
-			Kind: "pr", Repo: pr.Repo, ShowRepo: opts.ShowRepo, Number: pr.Number,
-			Title: title, URL: pr.URL, StoryID: id, Group: g, CI: CIOf(pr.CIState),
+			Kind: "pr", Repo: pr.Repo, Number: pr.Number,
+			Title: title, URL: pr.URL, StoryID: id, CI: ciOf(pr.CIState),
 			Author: pr.Author, Mine: pr.Author.Login == opts.Me,
-			Reviewers: Reviewers(pr, opts), UpdatedAt: pr.UpdatedAt,
+			Reviewers: reviewers(pr, opts), UpdatedAt: pr.UpdatedAt,
 		}
 		if id != "" && opts.ShortcutWorkspace != "" {
 			c.StoryURL = "https://app.shortcut.com/" + opts.ShortcutWorkspace + "/story/" + id
 		}
 		if reason != "" {
-			c.Labels = append(c.Labels, Label{reason, cmp.Or(reasonTone[reason], "gry")})
+			c.Labels = append(c.Labels, reason)
 		}
 		if pr.IsDraft {
-			c.Labels = append(c.Labels, Label{"draft", "gry"})
+			c.Labels = append(c.Labels, "draft")
 		}
 		if pr.Mergeable == "UNKNOWN" {
-			c.Labels = append(c.Labels, Label{"merge ?", "gry"})
+			c.Labels = append(c.Labels, "merge ?")
 		}
 		byGroup[g] = append(byGroup[g], c)
 	}
-	out := make([]Section, 0, len(Order))
-	for _, g := range Order {
+	out := make([]Section, 0, len(order))
+	for _, g := range order {
 		cards := byGroup[g]
 		slices.SortStableFunc(cards, func(a, b Card) int {
 			return cmp.Or(b.UpdatedAt.Compare(a.UpdatedAt), cmp.Compare(b.Number, a.Number))
 		})
-		info := groupInfo[g]
-		out = append(out, Section{Group: g, Name: info.name, Hint: info.hint, Color: info.color, Cards: cards})
+		out = append(out, Section{Group: g, Cards: cards})
 	}
 	return out
 }

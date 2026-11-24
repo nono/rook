@@ -41,7 +41,6 @@ func Load(ctx context.Context, f Fetcher, me string, cfg config.Config, now func
 		Me:                me,
 		ShortcutWorkspace: cfg.ShortcutWorkspace,
 		Ignore:            cfg.IgnoreReviewers,
-		ShowRepo:          len(cfg.Repos) > 1,
 	}
-	return board.Board{Sections: board.Build(all, opts), Errors: repoErrs, FetchedAt: now()}
+	return board.Board{Sections: board.Build(all, opts), Errors: repoErrs, FetchedAt: now(), ShowRepo: len(cfg.Repos) > 1}
 }

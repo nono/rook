@@ -62,17 +62,11 @@ func TestLoadErrorNamesRepoOnce(t *testing.T) {
 
 func TestLoadShowRepo(t *testing.T) {
 	f := fake{"o/a": {pr("o/a")}, "o/b": {pr("o/b")}}
-	two := Load(context.Background(), f, "me", config.Config{Repos: []string{"o/a", "o/b"}}, time.Now)
-	for _, c := range cards(two) {
-		if !c.ShowRepo {
-			t.Errorf("two repos: ShowRepo false on %+v", c)
-		}
+	if two := Load(context.Background(), f, "me", config.Config{Repos: []string{"o/a", "o/b"}}, time.Now); !two.ShowRepo {
+		t.Error("two repos: ShowRepo false")
 	}
-	one := Load(context.Background(), f, "me", config.Config{Repos: []string{"o/a"}}, time.Now)
-	for _, c := range cards(one) {
-		if c.ShowRepo {
-			t.Errorf("one repo: ShowRepo true on %+v", c)
-		}
+	if one := Load(context.Background(), f, "me", config.Config{Repos: []string{"o/a"}}, time.Now); one.ShowRepo {
+		t.Error("one repo: ShowRepo true")
 	}
 }
 
@@ -101,7 +95,6 @@ func TestLoadFetchedAt(t *testing.T) {
 // blocking returns a PR once all the expected calls have started, else an error after 1 s.
 type blocking struct {
 	started sync.WaitGroup
-	t       *testing.T
 }
 
 func (b *blocking) OpenPRs(_ context.Context, repo string) ([]github.PR, error) {
@@ -117,7 +110,7 @@ func (b *blocking) OpenPRs(_ context.Context, repo string) ([]github.PR, error) 
 }
 
 func TestLoadParallel(t *testing.T) {
-	f := &blocking{t: t}
+	f := &blocking{}
 	f.started.Add(2)
 	b := Load(context.Background(), f, "me", config.Config{Repos: []string{"o/a", "o/b"}}, time.Now)
 	if len(b.Errors) != 0 {

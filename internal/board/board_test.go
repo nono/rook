@@ -88,7 +88,7 @@ func TestClassify(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			g, reason := Classify(c.pr, Options{Me: "me", Ignore: c.ignore})
+			g, reason := classify(c.pr, Options{Me: "me", Ignore: c.ignore})
 			if g != c.group || reason != c.reason {
 				t.Fatalf("got (%s, %q), want (%s, %q)", g, reason, c.group, c.reason)
 			}
@@ -102,8 +102,8 @@ func TestCIOf(t *testing.T) {
 		"PENDING": CIPending, "EXPECTED": CIPending, "": CINone,
 		"SOMETHING_NEW": CIPending,
 	} {
-		if got := CIOf(in); got != want {
-			t.Errorf("CIOf(%q) = %s, want %s", in, got, want)
+		if got := ciOf(in); got != want {
+			t.Errorf("ciOf(%q) = %s, want %s", in, got, want)
 		}
 	}
 }
@@ -126,7 +126,7 @@ func TestReviewers(t *testing.T) {
 		},
 		func(p *github.PR) { p.RequestedTeams = []string{"core"} },
 	)
-	got := Reviewers(p, Options{Me: "me", Ignore: []string{"Rabbit"}})
+	got := reviewers(p, Options{Me: "me", Ignore: []string{"Rabbit"}})
 	want := []Reviewer{
 		{Login: "alice", State: Approved},
 		{Login: "bob", State: Requested},
@@ -139,9 +139,18 @@ func TestReviewers(t *testing.T) {
 	}
 }
 
+func TestReviewersDismissedOnly(t *testing.T) {
+	p := pr(reviews(rev("bob", "DISMISSED", "h1", 1), rev("eve", "DISMISSED", "h1", 2), rev("eve", "COMMENTED", "h2", 3)))
+	got := reviewers(p, Options{Me: "me"})
+	want := []Reviewer{{Login: "bob", State: Dismissed}, {Login: "eve", State: Commented}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %+v, want %+v", got, want)
+	}
+}
+
 func TestReviewersChangesVerdict(t *testing.T) {
 	p := pr(reviews(rev("bob", "CHANGES_REQUESTED", "h1", 1), rev("bob", "COMMENTED", "h2", 2)))
-	got := Reviewers(p, Options{Me: "me"})
+	got := reviewers(p, Options{Me: "me"})
 	want := []Reviewer{{Login: "bob", State: Changes}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v, want %+v", got, want)
@@ -157,9 +166,9 @@ func TestStoryID(t *testing.T) {
 		{"Fix", "SC-8-x", "8", "Fix"},
 	}
 	for _, c := range cases {
-		id, clean := StoryID(c.title, c.branch)
+		id, clean := storyID(c.title, c.branch)
 		if id != c.id || clean != c.clean {
-			t.Errorf("StoryID(%q, %q) = (%q, %q), want (%q, %q)", c.title, c.branch, id, clean, c.id, c.clean)
+			t.Errorf("storyID(%q, %q) = (%q, %q), want (%q, %q)", c.title, c.branch, id, clean, c.id, c.clean)
 		}
 	}
 }
@@ -170,26 +179,14 @@ func TestBuild(t *testing.T) {
 	newer := pr(func(p *github.PR) { p.Number = 2; p.UpdatedAt = t0.Add(time.Hour) })
 	wip := pr(mine, draft, requested("alice"), ci("FAILURE"), mergeable("UNKNOWN"), func(p *github.PR) { p.Number = 4 })
 
-	secs := Build([]github.PR{older, review, wip, newer}, Options{Me: "me", ShortcutWorkspace: "ws", ShowRepo: true})
+	secs := Build([]github.PR{older, review, wip, newer}, Options{Me: "me", ShortcutWorkspace: "ws"})
 
-	want := []struct {
-		g                 Group
-		name, hint, color string
-	}{
-		{Review, "Review", "your turn to review", "#ea580c"},
-		{WIP, "WIP", "your turn to fix", "#ca8a04"},
-		{Conflict, "Conflict", "rebase needed", "#dc2626"},
-		{Waiting, "Waiting", "others' turn", "#2563eb"},
-		{Team, "Team", "FYI", "#6b7280"},
+	var groups []Group
+	for _, s := range secs {
+		groups = append(groups, s.Group)
 	}
-	if len(secs) != len(want) {
-		t.Fatalf("got %d sections, want 5", len(secs))
-	}
-	for i, w := range want {
-		s := secs[i]
-		if s.Group != w.g || s.Name != w.name || s.Hint != w.hint || s.Color != w.color {
-			t.Errorf("section %d = %+v, want %+v", i, s, w)
-		}
+	if want := []Group{Review, WIP, Conflict, Waiting, Team}; !reflect.DeepEqual(groups, want) {
+		t.Fatalf("groups = %v, want %v", groups, want)
 	}
 	if len(secs[2].Cards) != 0 || len(secs[3].Cards) != 0 {
 		t.Errorf("conflict and waiting should be empty")
@@ -199,46 +196,31 @@ func TestBuild(t *testing.T) {
 		t.Fatalf("team cards not newest first: %+v", team)
 	}
 	c := secs[0].Cards[0]
-	if c.Kind != "pr" || c.StoryID != "9" || c.StoryURL != "https://app.shortcut.com/ws/story/9" || c.Title != "Do it" {
+	if c.Kind != "pr" || c.StoryID != "9" || c.StoryURL != "https://app.shortcut.com/ws/story/9" || c.Title != "Do it" || c.Mine {
 		t.Errorf("review card = %+v", c)
 	}
-	if !c.ShowRepo || c.Mine || c.Group != Review {
-		t.Errorf("review card flags = %+v", c)
-	}
-	if want := []Label{{"not reviewed", "gry"}}; !reflect.DeepEqual(c.Labels, want) {
-		t.Errorf("review labels = %+v, want %+v", c.Labels, want)
+	if want := []string{"not reviewed"}; !reflect.DeepEqual(c.Labels, want) {
+		t.Errorf("review labels = %q, want %q", c.Labels, want)
 	}
 	w := secs[1].Cards[0]
-	if want := []Label{{"CI red", "red"}, {"draft", "gry"}, {"merge ?", "gry"}}; !reflect.DeepEqual(w.Labels, want) {
-		t.Errorf("wip labels = %+v, want %+v", w.Labels, want)
+	if want := []string{"CI red", "draft", "merge ?"}; !reflect.DeepEqual(w.Labels, want) {
+		t.Errorf("wip labels = %q, want %q", w.Labels, want)
 	}
 	if !w.Mine || w.CI != CIRed {
 		t.Errorf("wip card = %+v", w)
 	}
 
 	noWS := Build([]github.PR{review}, Options{Me: "me"})
-	if c := noWS[0].Cards[0]; c.StoryID != "9" || c.StoryURL != "" || c.ShowRepo {
+	if c := noWS[0].Cards[0]; c.StoryID != "9" || c.StoryURL != "" {
 		t.Errorf("without workspace: %+v", c)
 	}
 }
 
-func TestBuildLabelTones(t *testing.T) {
-	cases := map[string]github.PR{
-		"conflict":    pr(mine, reviews(rev("alice", "COMMENTED", "h2", 1)), mergeable("CONFLICTING")),
-		"CI pending":  pr(mine, requested("alice"), ci("PENDING")),
-		"no reviewer": pr(mine),
-		"new commits": pr(reviews(rev("me", "COMMENTED", "h1", 1))),
-	}
-	tones := map[string]string{"conflict": "red", "CI pending": "ylw", "no reviewer": "ylw", "new commits": "gry"}
-	for reason, p := range cases {
-		var got []Label
-		for _, s := range Build([]github.PR{p}, Options{Me: "me"}) {
-			for _, c := range s.Cards {
-				got = c.Labels
-			}
-		}
-		if want := []Label{{reason, tones[reason]}}; !reflect.DeepEqual(got, want) {
-			t.Errorf("%s: labels %+v, want %+v", reason, got, want)
-		}
+func TestBuildSameTimeHigherNumberFirst(t *testing.T) {
+	low := pr(func(p *github.PR) { p.Number = 5 })
+	high := pr(func(p *github.PR) { p.Number = 7 })
+	team := Build([]github.PR{low, high}, Options{Me: "me"})[4].Cards
+	if team[0].Number != 7 || team[1].Number != 5 {
+		t.Fatalf("order = %d, %d; want 7, 5", team[0].Number, team[1].Number)
 	}
 }
