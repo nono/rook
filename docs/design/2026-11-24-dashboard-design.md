@@ -38,9 +38,9 @@ Success: I open the page in the morning and know my next action without a visit 
 ## Constraints
 
 - The user's GitHub login comes from the API (`viewer`), not from config.
-- First repo: `example-org/example-repo` (about 35 open PRs today).
+- First repo: one work repo with about 35 open PRs today.
 - The GitHub token comes from `gh auth token` at start-up.
-- Shortcut workspace slug: `example-ws` (from `scut whoami`).
+- Shortcut workspace slug: from config (`scut whoami` gives it).
 - `gh pr list --json` with reviews and checks fails with "exceeds the maximum limit of 500,000 nodes" and does not give the commit of each review. Use GraphQL directly.
 
 ## Approaches considered
