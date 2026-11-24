@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"flag"
 	"fmt"
 	"io"
@@ -24,6 +25,11 @@ import (
 )
 
 const usage = "usage: rook serve [--config PATH]"
+
+// icon is the favicon of the page.
+//
+//go:embed rook.svg
+var icon []byte
 
 // loadTimeout limits the GitHub calls of one page load. A repo that is slower
 // gets an error banner, and the page shows the other repos.
@@ -86,7 +92,7 @@ func serve(ctx context.Context, cfgPath string) error {
 		return err
 	}
 	log.Printf("rook: http://%s/ (user %s)", ln.Addr(), me)
-	return serveHTTP(ctx, ln, web.NewHandler(src, time.Now))
+	return serveHTTP(ctx, ln, web.NewHandler(src, time.Now, icon))
 }
 
 // serveHTTP serves h on ln until ctx ends. The end of ctx also cancels the

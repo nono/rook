@@ -16,6 +16,8 @@ import (
 
 var now = time.Date(2026, 11, 24, 10, 0, 0, 0, time.UTC)
 
+var testIcon = []byte(`<svg xmlns="http://www.w3.org/2000/svg"/>`)
+
 func TestShortAge(t *testing.T) {
 	for d, want := range map[time.Duration]string{
 		30 * time.Second:             "0m",
@@ -51,7 +53,7 @@ func sampleBoard(title string) board.Board {
 
 func get(t *testing.T, b board.Board, method, path string) (int, string) {
 	t.Helper()
-	h := NewHandler(func(context.Context) board.Board { return b }, func() time.Time { return now })
+	h := NewHandler(func(context.Context) board.Board { return b }, func() time.Time { return now }, testIcon)
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(method, path, nil)
 	req.Host = "127.0.0.1:7878"
@@ -86,6 +88,7 @@ func TestPageOrderAndContent(t *testing.T) {
 		`<span class="mk ok">✓</span>`, `<span class="mk ko">✗</span>`, `title="CI none">○<`, "carl: requested changes",
 		"updated 2h ago", "alice", "https://a/bob", "bob: approved", "core",
 		"background:#ea580c",
+		`<link rel="icon" href="/favicon.svg" type="image/svg+xml">`,
 		`window.open(card.dataset.url, "_blank", "noopener")`,
 		"Data from " + now.Local().Format("2006-01-02 15:04:05"),
 		"dave: review dismissed",
@@ -124,7 +127,7 @@ func TestPageEscapesTitle(t *testing.T) {
 
 // DNS rebinding: a page on another domain that resolves to 127.0.0.1 must not read the board.
 func TestRejectsForeignHost(t *testing.T) {
-	h := NewHandler(func(context.Context) board.Board { return sampleBoard("x") }, func() time.Time { return now })
+	h := NewHandler(func(context.Context) board.Board { return sampleBoard("x") }, func() time.Time { return now }, testIcon)
 	for host, want := range map[string]int{
 		"evil.example:7878": http.StatusMisdirectedRequest,
 		"evil.example":      http.StatusMisdirectedRequest,
@@ -155,7 +158,7 @@ func TestMethodNotAllowed(t *testing.T) {
 }
 
 func TestPageIsNotCached(t *testing.T) {
-	h := NewHandler(func(context.Context) board.Board { return sampleBoard("x") }, func() time.Time { return now })
+	h := NewHandler(func(context.Context) board.Board { return sampleBoard("x") }, func() time.Time { return now }, testIcon)
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Host = "127.0.0.1:7878"
 	rec := httptest.NewRecorder()
@@ -214,5 +217,28 @@ func TestLabelTones(t *testing.T) {
 		if !strings.Contains(body, `<span class="lab `+want+`">`+template.HTMLEscapeString(label)+`</span>`) {
 			t.Errorf("label %q: want tone %s", label, want)
 		}
+	}
+}
+
+func TestFavicon(t *testing.T) {
+	h := NewHandler(func(context.Context) board.Board { return sampleBoard("x") }, func() time.Time { return now }, testIcon)
+	for _, method := range []string{http.MethodGet, http.MethodHead} {
+		req := httptest.NewRequest(method, "/favicon.svg", nil)
+		req.Host = "127.0.0.1:7878"
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "image/svg+xml" {
+			t.Fatalf("%s /favicon.svg: status %d, type %q", method, rec.Code, rec.Header().Get("Content-Type"))
+		}
+		if method == http.MethodGet && rec.Body.String() != string(testIcon) {
+			t.Fatalf("body = %q", rec.Body.String())
+		}
+	}
+	req := httptest.NewRequest(http.MethodGet, "/favicon.svg", nil)
+	req.Host = "evil.example:7878"
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusMisdirectedRequest {
+		t.Fatalf("foreign host: status %d", rec.Code)
 	}
 }

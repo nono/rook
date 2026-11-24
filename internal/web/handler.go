@@ -66,8 +66,9 @@ func loopbackHost(host string) bool {
 	return loopback.Host(host)
 }
 
-// NewHandler serves the page at "/" to loopback hosts only.
-func NewHandler(src Source, now func() time.Time) http.Handler {
+// NewHandler serves the page at "/" and the SVG icon at "/favicon.svg", to
+// loopback hosts only.
+func NewHandler(src Source, now func() time.Time, icon []byte) http.Handler {
 	tmpl := template.Must(template.New("page").Funcs(template.FuncMap{
 		"age":       func(t time.Time) string { return shortAge(now().Sub(t)) },
 		"group":     func(g board.Group) groupStyle { return groupStyles[g] },
@@ -79,13 +80,18 @@ func NewHandler(src Source, now func() time.Time) http.Handler {
 			http.Error(w, "rook serves only loopback hosts", http.StatusMisdirectedRequest)
 			return
 		}
-		if r.URL.Path != "/" {
+		if r.URL.Path != "/" && r.URL.Path != "/favicon.svg" {
 			http.NotFound(w, r)
 			return
 		}
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			w.Header().Set("Allow", "GET, HEAD")
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if r.URL.Path == "/favicon.svg" {
+			w.Header().Set("Content-Type", "image/svg+xml")
+			_, _ = w.Write(icon)
 			return
 		}
 		var buf bytes.Buffer

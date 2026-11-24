@@ -85,3 +85,13 @@ func TestServeHTTPStopsDuringLoad(t *testing.T) {
 		t.Fatal("serveHTTP did not stop")
 	}
 }
+
+func TestIconIsRookSVG(t *testing.T) {
+	want, err := os.ReadFile("rook.svg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(icon, want) || !bytes.HasPrefix(icon, []byte("<svg")) {
+		t.Fatalf("icon is not rook.svg (%d bytes)", len(icon))
+	}
+}
