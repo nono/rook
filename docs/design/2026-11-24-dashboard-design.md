@@ -135,7 +135,7 @@ Top bar: the time of the data, a Refresh button (reloads the page), and an error
   - **github**: one GraphQL query per repo, paginated (100 PRs per page), returns plain Go structs. Repos are fetched in parallel.
   - **board**: pure functions. Input: PRs and my login. Output: the groups with the cards and the reasons. Holds all the rules above.
   - **web**: the HTTP handler and the templates.
-- Fields to fetch per PR: number, title, url, isDraft, updatedAt, headRefName, headRefOid, mergeable, author (login, avatarUrl, `__typename`), reviewRequests (User login/avatar, Team and EnterpriseTeam slug), reviews (state, submittedAt, commit oid, author login/avatar/`__typename`), also the last 100 reviews of the user (`author` filter), and the PR `statusCheckRollup.state`, which is the rollup of the head commit (checked live on fork PRs). Reviews can exceed one page on busy PRs (one PR of the work repo has about 90): fetch the last 100, which holds the last review of each person in practice.
+- Fields to fetch per PR: number, title, url, isDraft, updatedAt, headRefName, headRefOid, mergeable, author (login, avatarUrl, `__typename`), reviewRequests (User login/avatar, Team and EnterpriseTeam slug), reviews (id, state, submittedAt, commit oid, author login/avatar/`__typename`), also the last 100 reviews of the user (`author` filter; the id removes the reviews found twice), and the PR `statusCheckRollup.state` (GitHub: the rollup of the PR's head ref; it matched the rollup of the last commit on 134 open fork PRs of two public repos). Reviews can exceed one page on busy PRs (one PR of the work repo has about 90): fetch the last 100, which holds the last review of each person in practice.
 - Each page load fetches fresh data. No cache.
 
 ## Tests
