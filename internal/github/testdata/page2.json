@@ -16,7 +16,25 @@
             "author": {"__typename": "User", "login": "dave", "avatarUrl": "https://a/dave"},
             "reviewRequests": {"nodes": []},
             "reviews": {"nodes": []},
-            "commits": {"nodes": [{"commit": {"statusCheckRollup": {"state": "FAILURE"}}}]}
+            "mine": {"nodes": []},
+            "headRef": null,
+            "commits": {"nodes": [{"commit": {"statusCheckRollup": {"state": "PENDING"}}}]}
+          },
+          {
+            "number": 14,
+            "title": "Fourth",
+            "url": "https://github.com/o/r/pull/14",
+            "isDraft": false,
+            "updatedAt": "2026-11-21T08:00:00Z",
+            "headRefName": "fourth",
+            "headRefOid": "h14",
+            "mergeable": "MERGEABLE",
+            "author": {"__typename": "User", "login": "dave", "avatarUrl": "https://a/dave"},
+            "reviewRequests": {"nodes": []},
+            "reviews": {"nodes": []},
+            "mine": {"nodes": []},
+            "headRef": null,
+            "commits": {"nodes": []}
           }
         ]
       }

@@ -39,7 +39,7 @@ func server(t *testing.T, handle func(req gqlRequest) (int, string)) (*Client, *
 		_, _ = w.Write([]byte(body))
 	}))
 	t.Cleanup(srv.Close)
-	return &Client{Endpoint: srv.URL, Token: "tok", HTTP: srv.Client()}, &calls
+	return &Client{Endpoint: srv.URL, Token: "tok", HTTP: srv.Client(), Me: "me"}, &calls
 }
 
 func fixture(t *testing.T, name string) string {
@@ -53,7 +53,7 @@ func fixture(t *testing.T, name string) string {
 
 func pages(t *testing.T) (*Client, *atomic.Int32) {
 	return server(t, func(req gqlRequest) (int, string) {
-		if req.Variables["owner"] != "o" || req.Variables["name"] != "r" {
+		if req.Variables["owner"] != "o" || req.Variables["name"] != "r" || req.Variables["me"] != "me" {
 			t.Errorf("variables = %v", req.Variables)
 		}
 		switch req.Variables["cursor"] {
@@ -85,7 +85,7 @@ func TestOpenPRsFollowsPages(t *testing.T) {
 	for _, p := range prs {
 		nums = append(nums, p.Number)
 	}
-	if !reflect.DeepEqual(nums, []int{11, 12, 13}) {
+	if !reflect.DeepEqual(nums, []int{11, 12, 13, 14}) {
 		t.Fatalf("numbers = %v", nums)
 	}
 	if calls.Load() != 2 {
@@ -111,8 +111,12 @@ func TestOpenPRsMapsFields(t *testing.T) {
 				SubmittedAt: time.Date(2026, 11, 24, 7, 0, 0, 0, time.UTC), CommitOID: "h10"},
 			{Author: Actor{Login: "carol", AvatarURL: "https://a/carol"}, State: "APPROVED",
 				SubmittedAt: time.Date(2026, 11, 24, 7, 30, 0, 0, time.UTC)},
+			{Author: Actor{Login: "old", AvatarURL: "https://a/old", Bot: true}, State: "COMMENTED",
+				SubmittedAt: time.Date(2026, 11, 24, 7, 40, 0, 0, time.UTC), CommitOID: "h11"},
+			{Author: Actor{Login: "me", AvatarURL: "https://a/me"}, State: "CHANGES_REQUESTED",
+				SubmittedAt: time.Date(2026, 11, 23, 7, 0, 0, 0, time.UTC), CommitOID: "h9"},
 		},
-		CIState: "SUCCESS",
+		CIState: "FAILURE",
 	}
 	if !reflect.DeepEqual(prs[0], want) {
 		t.Fatalf("got  %+v\nwant %+v", prs[0], want)
@@ -120,8 +124,11 @@ func TestOpenPRsMapsFields(t *testing.T) {
 	if prs[1].CIState != "" || !prs[1].IsDraft || prs[1].Mergeable != "UNKNOWN" {
 		t.Errorf("PR 12 = %+v", prs[1])
 	}
-	if prs[2].CIState != "FAILURE" || prs[2].Mergeable != "CONFLICTING" {
-		t.Errorf("PR 13 = %+v", prs[2])
+	if prs[2].CIState != "PENDING" || prs[2].Mergeable != "CONFLICTING" {
+		t.Errorf("PR 13 (no headRef) = %+v", prs[2])
+	}
+	if prs[3].CIState != "" {
+		t.Errorf("PR 14 (no headRef, no commits) = %+v", prs[3])
 	}
 }
 
@@ -138,7 +145,7 @@ func TestOpenPRsNullAuthor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if prs[1].Author.Login != "ghost" || prs[1].Reviews[0].Author.Login != "ghost" {
+	if a, r := prs[1].Author, prs[1].Reviews[0].Author; a.Login != "ghost" || !a.Bot || r.Login != "ghost" || !r.Bot {
 		t.Fatalf("PR 12 = %+v", prs[1])
 	}
 }

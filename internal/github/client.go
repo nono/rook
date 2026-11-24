@@ -24,6 +24,9 @@ type Client struct {
 	Endpoint string
 	Token    string
 	HTTP     *http.Client
+	// Me is the login of the user. OpenPRs reads all the reviews of Me, also
+	// the ones older than the last 100 reviews of the PR.
+	Me string
 }
 
 // Viewer gives the login of the owner of the token.
@@ -43,12 +46,24 @@ type gqlActor struct {
 	AvatarURL string `json:"avatarUrl"`
 }
 
+// actor maps a GraphQL actor. Only a User is a person: a Bot, a Mannequin and
+// a deleted account (null, shown as "ghost") get Bot set.
 func (a *gqlActor) actor() Actor {
 	if a == nil {
-		return Actor{Login: "ghost"}
+		return Actor{Login: "ghost", Bot: true}
 	}
-	return Actor{Login: a.Login, AvatarURL: a.AvatarURL, Bot: a.Typename == "Bot"}
+	return Actor{Login: a.Login, AvatarURL: a.AvatarURL, Bot: a.Typename != "User"}
 }
+
+type gqlReview struct {
+	ID          string
+	State       string
+	SubmittedAt time.Time
+	Commit      *struct{ Oid string }
+	Author      *gqlActor
+}
+
+type gqlRollup *struct{ State string }
 
 type gqlPR struct {
 	Number      int
@@ -68,19 +83,14 @@ type gqlPR struct {
 			}
 		}
 	} `json:"reviewRequests"`
-	Reviews struct {
-		Nodes []struct {
-			State       string
-			SubmittedAt time.Time
-			Commit      *struct{ Oid string }
-			Author      *gqlActor
-		}
+	Reviews struct{ Nodes []gqlReview }
+	Mine    struct{ Nodes []gqlReview }
+	HeadRef *struct {
+		Target *struct{ StatusCheckRollup gqlRollup }
 	}
 	Commits struct {
 		Nodes []struct {
-			Commit struct {
-				StatusCheckRollup *struct{ State string }
-			}
+			Commit struct{ StatusCheckRollup gqlRollup }
 		}
 	}
 }
@@ -97,24 +107,34 @@ func (g gqlPR) pr(repo string) PR {
 		case r == nil:
 		case r.Typename == "Team":
 			p.RequestedTeams = append(p.RequestedTeams, r.Slug)
-		default:
+		case r.Typename == "User":
 			p.RequestedUsers = append(p.RequestedUsers, r.actor())
 		}
 	}
-	for _, n := range g.Reviews.Nodes {
-		if n.State == "PENDING" {
+	// Mine holds all my reviews: the last 100 reviews of the PR can miss them.
+	seen := map[string]bool{}
+	for _, n := range append(g.Reviews.Nodes, g.Mine.Nodes...) {
+		if n.State == "PENDING" || (n.ID != "" && seen[n.ID]) {
 			continue
 		}
+		seen[n.ID] = true
 		r := Review{Author: n.Author.actor(), State: n.State, SubmittedAt: n.SubmittedAt}
 		if n.Commit != nil {
 			r.CommitOID = n.Commit.Oid
 		}
 		p.Reviews = append(p.Reviews, r)
 	}
-	if len(g.Commits.Nodes) > 0 {
-		if s := g.Commits.Nodes[0].Commit.StatusCheckRollup; s != nil {
-			p.CIState = s.State
-		}
+	// The head commit gives the CI state. commits(last: 1) is only a fallback
+	// when the head branch is gone: that connection stops at 250 commits.
+	var rollup gqlRollup
+	switch {
+	case g.HeadRef != nil && g.HeadRef.Target != nil:
+		rollup = g.HeadRef.Target.StatusCheckRollup
+	case len(g.Commits.Nodes) > 0:
+		rollup = g.Commits.Nodes[0].Commit.StatusCheckRollup
+	}
+	if rollup != nil {
+		p.CIState = rollup.State
 	}
 	return p
 }
@@ -139,7 +159,7 @@ func (c *Client) OpenPRs(ctx context.Context, repo string) ([]PR, error) {
 				}
 			}
 		}
-		vars := map[string]any{"owner": owner, "name": name, "cursor": cursor}
+		vars := map[string]any{"owner": owner, "name": name, "cursor": cursor, "me": c.Me}
 		if err := c.post(ctx, prQuery, vars, &out); err != nil {
 			return nil, fmt.Errorf("%s: %w", repo, err)
 		}

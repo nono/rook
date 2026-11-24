@@ -74,6 +74,7 @@ func serve(ctx context.Context, cfgPath string) error {
 	if err != nil {
 		return err
 	}
+	client.Me = me
 	src := func(ctx context.Context) board.Board {
 		ctx, cancel := context.WithTimeout(ctx, loadTimeout)
 		defer cancel()

@@ -16,13 +16,22 @@
             "author": {"__typename": "User", "login": "me", "avatarUrl": "https://a/me"},
             "reviewRequests": {"nodes": [
               {"requestedReviewer": {"__typename": "User", "login": "alice", "avatarUrl": "https://a/alice"}},
-              {"requestedReviewer": {"__typename": "Team", "slug": "core"}}
+              {"requestedReviewer": {"__typename": "Team", "slug": "core"}},
+              {"requestedReviewer": {"__typename": "Bot", "login": "copilot", "avatarUrl": "https://a/copilot"}},
+              {"requestedReviewer": {"__typename": "Mannequin", "login": "old", "avatarUrl": "https://a/old"}},
+              {"requestedReviewer": null}
             ]},
             "reviews": {"nodes": [
-              {"state": "COMMENTED", "submittedAt": "2026-11-24T07:00:00Z", "commit": {"oid": "h10"}, "author": {"__typename": "Bot", "login": "rabbit", "avatarUrl": "https://a/rabbit"}},
-              {"state": "PENDING", "submittedAt": null, "commit": {"oid": "h11"}, "author": {"__typename": "User", "login": "bob", "avatarUrl": "https://a/bob"}},
-              {"state": "APPROVED", "submittedAt": "2026-11-24T07:30:00Z", "commit": null, "author": {"__typename": "User", "login": "carol", "avatarUrl": "https://a/carol"}}
+              {"id": "r1", "state": "COMMENTED", "submittedAt": "2026-11-24T07:00:00Z", "commit": {"oid": "h10"}, "author": {"__typename": "Bot", "login": "rabbit", "avatarUrl": "https://a/rabbit"}},
+              {"id": "r2", "state": "PENDING", "submittedAt": null, "commit": {"oid": "h11"}, "author": {"__typename": "User", "login": "bob", "avatarUrl": "https://a/bob"}},
+              {"id": "r3", "state": "APPROVED", "submittedAt": "2026-11-24T07:30:00Z", "commit": null, "author": {"__typename": "User", "login": "carol", "avatarUrl": "https://a/carol"}},
+              {"id": "r4", "state": "COMMENTED", "submittedAt": "2026-11-24T07:40:00Z", "commit": {"oid": "h11"}, "author": {"__typename": "Mannequin", "login": "old", "avatarUrl": "https://a/old"}}
             ]},
+            "mine": {"nodes": [
+              {"id": "r0", "state": "CHANGES_REQUESTED", "submittedAt": "2026-11-23T07:00:00Z", "commit": {"oid": "h9"}, "author": {"__typename": "User", "login": "me", "avatarUrl": "https://a/me"}},
+              {"id": "r3", "state": "APPROVED", "submittedAt": "2026-11-24T07:30:00Z", "commit": null, "author": {"__typename": "User", "login": "carol", "avatarUrl": "https://a/carol"}}
+            ]},
+            "headRef": {"target": {"oid": "h11", "statusCheckRollup": {"state": "FAILURE"}}},
             "commits": {"nodes": [{"commit": {"statusCheckRollup": {"state": "SUCCESS"}}}]}
           },
           {
@@ -37,8 +46,10 @@
             "author": null,
             "reviewRequests": {"nodes": []},
             "reviews": {"nodes": [
-              {"state": "COMMENTED", "submittedAt": "2026-11-23T09:00:00Z", "commit": {"oid": "h12"}, "author": null}
+              {"id": "r5", "state": "COMMENTED", "submittedAt": "2026-11-23T09:00:00Z", "commit": {"oid": "h12"}, "author": null}
             ]},
+            "mine": {"nodes": []},
+            "headRef": {"target": {"oid": "h12", "statusCheckRollup": null}},
             "commits": {"nodes": [{"commit": {"statusCheckRollup": null}}]}
           }
         ]

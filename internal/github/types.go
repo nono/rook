@@ -3,11 +3,13 @@ package github
 
 import "time"
 
-// Actor is a GitHub account: a user or a bot.
+// Actor is a GitHub account.
 type Actor struct {
 	Login     string
 	AvatarURL string
-	Bot       bool
+	// Bot is true for each account that is not a GraphQL User: a bot, a
+	// mannequin, or a deleted account (Login "ghost").
+	Bot bool
 }
 
 // Review is a submitted review of a pull request.
