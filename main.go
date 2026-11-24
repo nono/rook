@@ -113,7 +113,7 @@ func ghToken(ctx context.Context) (string, error) {
 	out, err := exec.CommandContext(ctx, "gh", "auth", "token", "--hostname", "github.com").Output()
 	token := strings.TrimSpace(string(out))
 	if err != nil || token == "" {
-		return "", fmt.Errorf(`no GitHub token: run "gh auth login" first (%v)`, err)
+		return "", fmt.Errorf(`no GitHub token from "gh auth token": install gh and run "gh auth login" (%v)`, err)
 	}
 	return token, nil
 }

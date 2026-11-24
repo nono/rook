@@ -121,7 +121,7 @@ Top bar: the time of the data, a Refresh button (reloads the page), and an error
 ## Architecture
 
 - Go, one binary, `rook`. Templates and CSS embedded with `embed`. No JS framework; a few lines of JS at most.
-- `rook serve` listens on `127.0.0.1` only.
+- `rook serve` listens on a loopback address only: `127.0.0.1` by default; `localhost` and `[::1]` are also accepted.
 - Config: TOML at `~/.config/rook/config.toml`, path overridable with `--config`.
 
   ```toml

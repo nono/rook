@@ -43,8 +43,9 @@ func Age(d time.Duration) string {
 	return fmt.Sprintf("%dm", int(max(d, 0)/time.Minute))
 }
 
-// loopbackHost tells if the Host header names this machine. Other names come
-// from DNS rebinding: a foreign page that resolves its own domain to 127.0.0.1.
+// loopbackHost tells if the Host header is "localhost" or a loopback IP. Rook
+// refuses all other names, to block DNS rebinding: a foreign page that
+// resolves its own domain to 127.0.0.1.
 func loopbackHost(host string) bool {
 	if h, _, err := net.SplitHostPort(host); err == nil {
 		host = h

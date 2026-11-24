@@ -98,7 +98,7 @@ func TestLoadFetchedAt(t *testing.T) {
 	}
 }
 
-// blocking returns only once all the expected calls have started.
+// blocking returns a PR once all the expected calls have started, else an error after 1 s.
 type blocking struct {
 	started sync.WaitGroup
 	t       *testing.T

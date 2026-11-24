@@ -4,12 +4,12 @@ Rook is a local web page that sorts the open pull requests of some GitHub repos 
 
 ## Groups
 
-The groups show from top to bottom in this order. Each PR goes into the first group that matches.
+Each PR goes into the first group that matches, in the order of this list. The page shows the groups from top to bottom: Review, WIP, Conflict, Waiting, then Team.
 
 For a PR that you did not author:
 
-1. **Review**: your review is requested ("not reviewed" or "requested again").
-2. **Review**: you reviewed it before, your last verdict is not an approval, and your last review is on an older commit than the head ("new commits").
+1. **Review**: your review is requested from you, not from a team ("not reviewed" or "requested again").
+2. **Review**: you reviewed it before, your last verdict is not an approval, and your last review is on a commit other than the head ("new commits").
 3. **Team**: all the other PRs.
 
 For your own PRs, drafts included:
