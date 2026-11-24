@@ -248,7 +248,7 @@ func TestClaudeLogo(t *testing.T) {
 	b := sampleBoard("Do it")
 	second := b.Sections[0].Cards[0]
 	second.Number = 2
-	b.Sections[0].Cards[0].Claude = []string{"/w/1", "/w/2"}
+	b.Sections[0].Cards[0].SessionDirs = []string{"/w/1", "/w/2"}
 	b.Sections[0].Cards = append(b.Sections[0].Cards, second)
 	_, body := get(t, b, http.MethodGet, "/")
 	if n := strings.Count(body, `class="claude"`); n != 1 {
@@ -269,7 +269,7 @@ func TestClaudeLogo(t *testing.T) {
 func TestClaudeLogoInEachGroup(t *testing.T) {
 	b := sampleBoard("Do it")
 	card := b.Sections[0].Cards[0]
-	card.Claude = []string{"/w"}
+	card.SessionDirs = []string{"/w"}
 	for i := range b.Sections {
 		b.Sections[i].Cards = []board.Card{card}
 	}

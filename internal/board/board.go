@@ -72,7 +72,8 @@ type Card struct {
 	Mine      bool
 	Reviewers []Reviewer
 	UpdatedAt time.Time
-	Claude    []string // the directories of the Claude Code sessions on the PR's branch
+	// SessionDirs are the directories of the Claude Code sessions on the PR's branch.
+	SessionDirs []string
 }
 
 // Section is a group with its cards.
@@ -267,7 +268,7 @@ func Build(prs []github.PR, opts Options) []Section {
 			Title: title, URL: pr.URL, StoryID: id, CI: ciOf(pr.CIState),
 			Author: pr.Author, Mine: pr.Author.Login == opts.Me,
 			Reviewers: reviewers(pr, opts), UpdatedAt: pr.UpdatedAt,
-			Claude: dirs,
+			SessionDirs: dirs,
 		}
 		if id != "" && opts.ShortcutWorkspace != "" {
 			c.StoryURL = "https://app.shortcut.com/" + opts.ShortcutWorkspace + "/story/" + id

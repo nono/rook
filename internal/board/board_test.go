@@ -44,6 +44,7 @@ func reviews(rs ...github.Review) func(*github.PR) {
 }
 func ci(state string) func(*github.PR)        { return func(p *github.PR) { p.CIState = state } }
 func mergeable(state string) func(*github.PR) { return func(p *github.PR) { p.Mergeable = state } }
+func head(branch string) func(*github.PR)     { return func(p *github.PR) { p.HeadRefName = branch } }
 
 func TestClassify(t *testing.T) {
 	bot := rev("rabbit[bot]", "COMMENTED", "h2", 1)
@@ -122,7 +123,6 @@ func TestClassifyClaude(t *testing.T) {
 }
 
 func TestBuildSessions(t *testing.T) {
-	head := func(b string) func(*github.PR) { return func(p *github.PR) { p.HeadRefName = b } }
 	p1 := pr(mine, requested("alice"), head("sc-1/a"))
 	p2 := pr(head("b"), func(p *github.PR) { p.Number = 2 })
 	find := func(secs []Section, n int) (Group, Card) {
@@ -144,30 +144,30 @@ func TestBuildSessions(t *testing.T) {
 		{Dir: "/w/4", Repo: "o/x", Branches: []string{"b"}},
 	}})
 	g, c := find(secs, 1)
-	if g != WIP || !reflect.DeepEqual(c.Labels, []string{"Claude"}) || !reflect.DeepEqual(c.Claude, []string{"/w/1", "/w/2"}) {
+	if g != WIP || !reflect.DeepEqual(c.Labels, []string{"Claude"}) || !reflect.DeepEqual(c.SessionDirs, []string{"/w/1", "/w/2"}) {
 		t.Errorf("p1: group %s, card %+v", g, c)
 	}
-	if g, c := find(secs, 2); g != Team || c.Claude != nil {
-		t.Errorf("p2: group %s, Claude %q; want team, nil", g, c.Claude)
+	if g, c := find(secs, 2); g != Team || c.SessionDirs != nil {
+		t.Errorf("p2: group %s, SessionDirs %q; want team, nil", g, c.SessionDirs)
 	}
 
 	secs = Build([]github.PR{p2}, Options{Me: "me", Sessions: []claude.Session{{Dir: "/w/5", Repo: "o/r", Branches: []string{"b"}}}})
-	if g, c := find(secs, 2); g != Team || !reflect.DeepEqual(c.Claude, []string{"/w/5"}) {
-		t.Errorf("p2 with session: group %s, Claude %q; want team, [/w/5]", g, c.Claude)
+	if g, c := find(secs, 2); g != Team || !reflect.DeepEqual(c.SessionDirs, []string{"/w/5"}) {
+		t.Errorf("p2 with session: group %s, SessionDirs %q; want team, [/w/5]", g, c.SessionDirs)
 	}
 
 	// A CI-red PR keeps its label and gets the session directories.
 	red := pr(mine, requested("alice"), head("sc-1/a"), ci("FAILURE"), func(p *github.PR) { p.Number = 4 })
 	secs = Build([]github.PR{red}, Options{Me: "me", Sessions: []claude.Session{{Dir: "/w/7", Repo: "o/r", Branches: []string{"sc-1/a"}}}})
-	if g, c := find(secs, 4); g != WIP || !reflect.DeepEqual(c.Labels, []string{"CI red"}) || !reflect.DeepEqual(c.Claude, []string{"/w/7"}) {
+	if g, c := find(secs, 4); g != WIP || !reflect.DeepEqual(c.Labels, []string{"CI red"}) || !reflect.DeepEqual(c.SessionDirs, []string{"/w/7"}) {
 		t.Errorf("CI-red PR: group %s, card %+v", g, c)
 	}
 
 	// The head branch of a fork PR is in the fork, not in the repo of the session.
 	fork := pr(mine, requested("alice"), head("main"), func(p *github.PR) { p.Number = 3; p.Fork = true })
 	secs = Build([]github.PR{fork}, Options{Me: "me", Sessions: []claude.Session{{Dir: "/w/6", Repo: "o/r", Branches: []string{"main"}}}})
-	if g, c := find(secs, 3); g != Waiting || c.Claude != nil {
-		t.Errorf("fork PR: group %s, Claude %q; want waiting, nil", g, c.Claude)
+	if g, c := find(secs, 3); g != Waiting || c.SessionDirs != nil {
+		t.Errorf("fork PR: group %s, SessionDirs %q; want waiting, nil", g, c.SessionDirs)
 	}
 }
 

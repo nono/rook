@@ -37,9 +37,9 @@ func TestRepoOf(t *testing.T) {
 		{"/srv/git/r.git", "", false},
 	}
 	for _, c := range cases {
-		got, ok := RepoOf(c.url)
+		got, ok := repoOf(c.url)
 		if got != c.want || ok != c.ok {
-			t.Errorf("RepoOf(%q) = %q, %v; want %q, %v", c.url, got, ok, c.want, c.ok)
+			t.Errorf("repoOf(%q) = %q, %v; want %q, %v", c.url, got, ok, c.want, c.ok)
 		}
 	}
 }
@@ -55,9 +55,6 @@ func git(t *testing.T, dir string, args ...string) {
 // git config of the user and from the GIT_DIR and the like of the environment.
 func isolate(t *testing.T) {
 	t.Helper()
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not in PATH")
-	}
 	for _, v := range localEnv {
 		t.Setenv(v, "")
 		if err := os.Unsetenv(v); err != nil {

@@ -24,7 +24,7 @@ When I work on one of my PRs with Claude Code, the card stays in Waiting. The wo
 
 ## Approaches considered
 
-1. **Ask git in each cwd (chosen).** List the `claude` processes, read their cwd, and ask git for the branch and remote of that cwd. No config. A worktree created anywhere works. Cost: about 40 ms of git calls per session, run at the same time as the GitHub fetch.
+1. **Ask git in each cwd (chosen).** List the `claude` processes, read their cwd, and ask git for the branch and remote of that cwd. No config. A worktree created anywhere works. Cost: about 7 ms of git calls per session (45 ms for 6 sessions), run at the same time as the GitHub fetch.
 2. **Worktree list of the configured clones.** A config key lists the local clones; `git worktree list --porcelain` gives the path and branch of each worktree, matched to the cwd by path. One git call per clone. Rejected: a new config key to keep current, and a clone not in the list is silently missed.
 3. **Claude Code hooks.** SessionStart and SessionEnd hooks write a file per session. Rejected for now: hooks to set up, stale files after a crash, sessions started before the setup are missed. It stays the path to "idle or active" later.
 
@@ -50,9 +50,9 @@ The rules of the README and of `2026-11-24-dashboard-design.md` get one new rule
 
 4. CI red or pending → WIP (no change).
 5. No reviewer → WIP (no change).
-5b. **A Claude Code session is open on the PR → WIP ("Claude").**
-6. Conflict → Conflict.
-7. Waiting.
+6. **A Claude Code session is open on the PR → WIP ("Claude").**
+7. Conflict → Conflict.
+8. Waiting.
 
 For a PR I did not author, rules 1 to 3 do not change: a session keeps Review in Review and Team in Team.
 
@@ -69,12 +69,12 @@ The Claude logo goes in footer line 1, after the CI dot, on each card with a ses
 
 - New package (for example `internal/claude`) that gives the sessions: a list of (repo, branch, dir). It reads a `/proc` root given as a parameter, so tests use a temporary directory.
 - `app.Load` reads the sessions at the same time as the PRs, and gives them to the board in `board.Options`.
-- `board.Build` sets the session directories on the card and applies rule 5b. The board stays pure.
+- `board.Build` sets the session directories on the card and applies rule 6. The board stays pure.
 - The logo is an inline SVG in `page.html`.
 
 ## Tests
 
-- **board**: rule 5b; Review with a session stays Review ("not reviewed" etc.); Team with a session stays Team, with the logo; CI red and session → "CI red"; conflict and session → WIP "Claude"; no session → no change; repo match without case; branch match with case.
+- **board**: rule 6; Review with a session stays Review ("not reviewed" etc.); Team with a session stays Team, with the logo; CI red and session → "CI red"; conflict and session → WIP "Claude"; no session → no change; repo match without case; branch match with case.
 - **sessions**: remote URL forms and other hosts; upstream branch with a name different from the local branch; no upstream; detached `HEAD`; a rebase stopped on a conflict; cwd not in a repo; a fake `/proc` with `claude` and other processes.
 - **web**: the logo and its tooltip show when the card has a session, and not when it has none.
 - README: the new rule and a line on the sessions (Linux only).

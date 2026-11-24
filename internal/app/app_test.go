@@ -129,7 +129,7 @@ func TestLoadUsesSessions(t *testing.T) {
 	}
 	b := Load(context.Background(), fake{"o/a": {p}}, sessions, "me", config.Config{Repos: []string{"o/a"}}, time.Now)
 	wip := b.Sections[1]
-	if wip.Group != board.WIP || len(wip.Cards) != 1 || len(wip.Cards[0].Claude) != 1 || wip.Cards[0].Claude[0] != "/w" {
+	if wip.Group != board.WIP || len(wip.Cards) != 1 || len(wip.Cards[0].SessionDirs) != 1 || wip.Cards[0].SessionDirs[0] != "/w" {
 		t.Fatalf("WIP section = %+v", wip)
 	}
 }
@@ -138,15 +138,9 @@ func TestLoadSessionsInParallel(t *testing.T) {
 	f := &blocking{}
 	f.started.Add(2)
 	parallel := false
-	sessions := func(context.Context) []claude.Session {
-		f.started.Done()
-		done := make(chan struct{})
-		go func() { f.started.Wait(); close(done) }()
-		select {
-		case <-done:
-			parallel = true
-		case <-time.After(time.Second):
-		}
+	sessions := func(ctx context.Context) []claude.Session {
+		_, err := f.OpenPRs(ctx, "o/b")
+		parallel = err == nil
 		return nil
 	}
 	b := Load(context.Background(), f, sessions, "me", config.Config{Repos: []string{"o/a"}}, time.Now)

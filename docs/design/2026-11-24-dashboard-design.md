@@ -78,8 +78,9 @@ For a PR I authored (drafts included; a draft follows the same rules):
 
 4. CI red or pending → **WIP** ("CI red" / "CI pending").
 5. No review requested from a human or a team, and no human review → **WIP** ("no reviewer").
-6. Conflict → **conflict**.
-7. Else → **waiting**.
+6. A Claude Code session is open on the PR's branch → **WIP** ("Claude"). See `2026-11-24-claude-sessions-design.md`.
+7. Conflict → **conflict**.
+8. Else → **waiting**.
 
 A change request from a reviewer on my PR does not move it to WIP (confirmed with the user): we may wait for another reviewer, or for another PR to merge. The red avatar on the card shows it.
 
@@ -101,7 +102,7 @@ Card style: "Shortcut-like" (style C of the mockups, in `.superpowers/brainstorm
 
 - a 4 px strip on top in the group color;
 - the title, without its `[sc-NNNN]` prefix, bold;
-- labels: the reason of the group ("CI red", "no reviewer", "conflict", "not reviewed", "new commits"), "draft", "merge ?";
+- labels: the reason of the group ("CI red", "no reviewer", "Claude", "conflict", "not reviewed", "new commits"), "draft", "merge ?";
 - footer line 1: the story ID as a link to `https://app.shortcut.com/<workspace>/story/NNNN`, `#number`, a CI dot (green, red, amber, gray for no checks), and the reviewer avatars on the right;
 - footer line 2: the author's avatar and login (or "mine"), and "updated Xd ago";
 - the whole card opens the PR in a new tab; the story link opens the story and does not open the PR.

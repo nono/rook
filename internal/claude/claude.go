@@ -25,10 +25,10 @@ type Session struct {
 	Branches []string
 }
 
-// RepoOf gives the "owner/name" of a GitHub remote URL: scp-like
+// repoOf gives the "owner/name" of a GitHub remote URL: scp-like
 // ("[user@]github.com:owner/name") or a URL ("ssh://", "https://", with a
 // user and a port or not), on github.com or ssh.github.com.
-func RepoOf(remote string) (string, bool) {
+func repoOf(remote string) (string, bool) {
 	var host, path string
 	if strings.Contains(remote, "://") {
 		u, err := url.Parse(remote)
@@ -116,7 +116,7 @@ func lookup(ctx context.Context, dir string) (repo string, branches []string, ok
 	if err != nil {
 		return "", nil, false
 	}
-	repo, ok = RepoOf(url)
+	repo, ok = repoOf(url)
 	if !ok {
 		return "", nil, false
 	}

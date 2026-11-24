@@ -114,7 +114,7 @@ func TestNewSourceUsesSessions(t *testing.T) {
 		return []claude.Session{{Dir: "/w", Repo: "o/a", Branches: []string{"x"}}}
 	}
 	b := newSource(fetcher{p}, sessions, "me", config.Config{Repos: []string{"o/a"}})(context.Background())
-	if wip := b.Sections[1]; wip.Group != board.WIP || len(wip.Cards) != 1 || len(wip.Cards[0].Claude) != 1 {
+	if wip := b.Sections[1]; wip.Group != board.WIP || len(wip.Cards) != 1 || len(wip.Cards[0].SessionDirs) != 1 {
 		t.Fatalf("WIP = %+v", wip)
 	}
 }

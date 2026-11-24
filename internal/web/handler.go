@@ -11,7 +11,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/nono/rook/internal/board"
@@ -57,15 +56,6 @@ func shortAge(d time.Duration) string {
 	return fmt.Sprintf("%dm", int(max(d, 0)/time.Minute))
 }
 
-// claudeTitle gives the tooltip of the Claude logo: one line per session directory.
-func claudeTitle(dirs []string) string {
-	lines := make([]string, len(dirs))
-	for i, d := range dirs {
-		lines[i] = "Claude Code in " + d
-	}
-	return strings.Join(lines, "\n")
-}
-
 // loopbackHost tells if the Host header is "localhost" or a loopback IP. Rook
 // refuses all other names, to block DNS rebinding: a foreign page that
 // resolves its own domain to 127.0.0.1.
@@ -80,11 +70,10 @@ func loopbackHost(host string) bool {
 // loopback hosts only.
 func NewHandler(src Source, now func() time.Time, icon []byte) http.Handler {
 	tmpl := template.Must(template.New("page").Funcs(template.FuncMap{
-		"age":         func(t time.Time) string { return shortAge(now().Sub(t)) },
-		"group":       func(g board.Group) groupStyle { return groupStyles[g] },
-		"tone":        func(label string) string { return cmp.Or(labelTones[label], "gry") },
-		"stateWord":   func(s board.ReviewerState) string { return stateWords[s] },
-		"claudeTitle": claudeTitle,
+		"age":       func(t time.Time) string { return shortAge(now().Sub(t)) },
+		"group":     func(g board.Group) groupStyle { return groupStyles[g] },
+		"tone":      func(label string) string { return cmp.Or(labelTones[label], "gry") },
+		"stateWord": func(s board.ReviewerState) string { return stateWords[s] },
 	}).Parse(pageHTML))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !loopbackHost(r.Host) {
