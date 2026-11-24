@@ -1,5 +1,7 @@
 # Rook: show the PRs that have a Claude Code session
 
+Status: record of the design on 2026-11-24. It is not updated. The README is the spec of the current behavior.
+
 ## Intent
 
 When I work on one of my PRs with Claude Code, the card stays in Waiting. The work is in progress, so the card must be in WIP. Each card with an open Claude Code session also shows the Claude logo.
