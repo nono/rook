@@ -5,6 +5,7 @@ import (
 	"cmp"
 	"regexp"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/nono/rook/internal/github"
@@ -133,8 +134,14 @@ func CIOf(state string) CI {
 	return CIPending
 }
 
+// person tells if a is a person: not a bot or other non-User account, and not in the ignore list.
+// GitHub logins do not depend on case.
+func person(a github.Actor, opts Options) bool {
+	return !a.Bot && !slices.ContainsFunc(opts.Ignore, func(l string) bool { return strings.EqualFold(l, a.Login) })
+}
+
 func human(a github.Actor, pr github.PR, opts Options) bool {
-	return !a.Bot && a.Login != pr.Author.Login && !slices.Contains(opts.Ignore, a.Login)
+	return person(a, opts) && a.Login != pr.Author.Login
 }
 
 // sortedReviews gives the reviews of login, oldest first.
@@ -185,7 +192,9 @@ func Classify(pr github.PR, opts Options) (Group, string) {
 		return WIP, "CI pending"
 	}
 	hasHuman := slices.ContainsFunc(pr.Reviews, func(r github.Review) bool { return human(r.Author, pr, opts) })
-	if len(pr.RequestedUsers) == 0 && len(pr.RequestedTeams) == 0 && !hasHuman {
+	hasRequest := len(pr.RequestedTeams) > 0 ||
+		slices.ContainsFunc(pr.RequestedUsers, func(a github.Actor) bool { return person(a, opts) })
+	if !hasRequest && !hasHuman {
 		return WIP, "no reviewer"
 	}
 	if pr.Mergeable == "CONFLICTING" {
@@ -222,7 +231,7 @@ func Reviewers(pr github.PR, opts Options) []Reviewer {
 			out[i].State = Requested
 			continue
 		}
-		if u.Bot || slices.Contains(opts.Ignore, u.Login) {
+		if !person(u, opts) {
 			continue
 		}
 		index[u.Login] = len(out)

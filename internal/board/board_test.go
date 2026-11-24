@@ -80,6 +80,11 @@ func TestClassify(t *testing.T) {
 		{"mine: changes requested, CI green", pr(mine, reviews(rev("alice", "CHANGES_REQUESTED", "h2", 1))), nil, Waiting, ""},
 		{"mine: draft, CI green, requested", pr(mine, draft, requested("alice")), nil, Waiting, ""},
 		{"mine: UNKNOWN mergeable, requested", pr(mine, requested("alice"), mergeable("UNKNOWN")), nil, Waiting, ""},
+		{"mine: only a bot requested", pr(mine, func(p *github.PR) { p.RequestedUsers = []github.Actor{{Login: "copilot", Bot: true}} }), nil, WIP, "no reviewer"},
+		{"mine: only an ignored login requested", pr(mine, requested("rabbit")), []string{"rabbit"}, WIP, "no reviewer"},
+		{"mine: ignored login, other case", pr(mine, reviews(rev("rabbit", "COMMENTED", "h2", 1))), []string{"Rabbit"}, WIP, "no reviewer"},
+		{"mine: no reviewer and CONFLICTING", pr(mine, mergeable("CONFLICTING")), nil, WIP, "no reviewer"},
+		{"team request with my login is not a request to me", pr(func(p *github.PR) { p.RequestedTeams = []string{"me"} }), nil, Team, ""},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -95,6 +100,7 @@ func TestCIOf(t *testing.T) {
 	for in, want := range map[string]CI{
 		"SUCCESS": CIGreen, "FAILURE": CIRed, "ERROR": CIRed,
 		"PENDING": CIPending, "EXPECTED": CIPending, "": CINone,
+		"SOMETHING_NEW": CIPending,
 	} {
 		if got := CIOf(in); got != want {
 			t.Errorf("CIOf(%q) = %s, want %s", in, got, want)
@@ -114,10 +120,13 @@ func TestReviewers(t *testing.T) {
 			bot,
 			rev("other", "COMMENTED", "h2", 6),
 		),
-		requested("bob", "dave"),
+		requested("bob", "dave", "rabbit"),
+		func(p *github.PR) {
+			p.RequestedUsers = append(p.RequestedUsers, github.Actor{Login: "copilot", Bot: true})
+		},
 		func(p *github.PR) { p.RequestedTeams = []string{"core"} },
 	)
-	got := Reviewers(p, Options{Me: "me"})
+	got := Reviewers(p, Options{Me: "me", Ignore: []string{"Rabbit"}})
 	want := []Reviewer{
 		{Login: "alice", State: Approved},
 		{Login: "bob", State: Requested},
