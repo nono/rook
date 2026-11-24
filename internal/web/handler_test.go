@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"html"
 	"html/template"
 	"io"
 	"net/http"
@@ -208,7 +209,7 @@ func TestEveryGroupHasStyle(t *testing.T) {
 
 func TestLabelTones(t *testing.T) {
 	for label, want := range map[string]string{
-		"CI red": "red", "conflict": "red", "CI pending": "ylw", "no reviewer": "ylw",
+		"CI red": "red", "conflict": "red", "CI pending": "ylw", "no reviewer": "ylw", "Claude": "ylw",
 		"not reviewed": "gry", "requested again": "gry", "new commits": "gry", "draft": "gry", "merge ?": "gry",
 	} {
 		b := sampleBoard("x")
@@ -240,5 +241,28 @@ func TestFavicon(t *testing.T) {
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusMisdirectedRequest {
 		t.Fatalf("foreign host: status %d", rec.Code)
+	}
+}
+
+func TestClaudeLogo(t *testing.T) {
+	b := sampleBoard("Do it")
+	second := b.Sections[0].Cards[0]
+	second.Number = 2
+	b.Sections[0].Cards[0].Claude = []string{"/w/1", "/w/2"}
+	b.Sections[0].Cards = append(b.Sections[0].Cards, second)
+	_, body := get(t, b, http.MethodGet, "/")
+	if n := strings.Count(body, `class="claude"`); n != 1 {
+		t.Fatalf("%d Claude logos, want 1", n)
+	}
+	i := strings.Index(body, `class="claude"`)
+	if ci := strings.Index(body, `class="ci `); ci < 0 || i < ci {
+		t.Errorf("logo at %d, before the CI dot at %d", i, ci)
+	}
+	tag := body[i:]
+	tag = html.UnescapeString(tag[:strings.Index(tag, ">")])
+	for _, want := range []string{"Claude Code in /w/1", "Claude Code in /w/2"} {
+		if !strings.Contains(tag, want) {
+			t.Errorf("logo tag %q does not contain %q", tag, want)
+		}
 	}
 }
