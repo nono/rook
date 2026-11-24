@@ -83,14 +83,13 @@ func TestPageOrderAndContent(t *testing.T) {
 	}
 	for _, want := range []string{
 		`href="https://app.shortcut.com/ws/story/9"`,
-		`data-url="https://github.com/o/r/pull/1"`,
+		`<a class="t card-link" href="https://github.com/o/r/pull/1"`,
 		"nothing", "o/x: boom", "Refresh", "your turn to review",
-		`<span class="lab ylw">no reviewer</span>`, `<span class="lab gry">draft</span>`, "stopPropagation", "Do it",
+		`<span class="lab ylw">no reviewer</span>`, `<span class="lab gry">draft</span>`, "Do it",
 		`<span class="mk ok">✓</span>`, `<span class="mk ko">✗</span>`, `title="CI none">○<`, "carl: requested changes",
 		"updated 2h ago", "alice", "https://a/bob", "bob: approved", "core",
 		"background:#ea580c",
 		`<link rel="icon" href="/favicon.svg" type="image/svg+xml">`,
-		`window.open(card.dataset.url, "_blank", "noopener")`,
 		"Data from " + now.Local().Format("2006-01-02 15:04:05"),
 		"dave: review dismissed",
 	} {
@@ -178,6 +177,18 @@ func TestAvatarsWrap(t *testing.T) {
 	rule := pageHTML[i : i+strings.Index(pageHTML[i:], "}")]
 	if !strings.Contains(rule, "flex-wrap: wrap") {
 		t.Fatalf(".avs rule = %q, want flex-wrap: wrap", rule)
+	}
+}
+
+// The title link covers the whole card, so a click anywhere opens the PR.
+func TestCardLinkCoversCard(t *testing.T) {
+	for _, want := range []string{
+		".card { position: relative;",
+		`.card a.card-link::after { content: ""; position: absolute; inset: 0; }`,
+	} {
+		if !strings.Contains(pageHTML, want) {
+			t.Errorf("page does not contain %q", want)
+		}
 	}
 }
 

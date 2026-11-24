@@ -24,8 +24,14 @@
   .empty { color: #999; font-size: 14px; padding: 8px; font-style: italic; }
   .sp { flex: 1; }
 
-  .card { display: flex; flex-direction: column; width: 310px; background: #fff; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.12); font-size: 14px; color: #1f2937; cursor: pointer; }
-  .card:hover { box-shadow: 0 3px 8px rgba(0,0,0,.18); }
+  .card { position: relative; display: flex; flex-direction: column; width: 310px; background: #fff; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.12); font-size: 14px; color: #1f2937; }
+  .card:has(a.card-link:hover) { box-shadow: 0 3px 8px rgba(0,0,0,.18); }
+  /* The title link covers the whole card. */
+  .card a.card-link::after { content: ""; position: absolute; inset: 0; }
+  .card a.card-link:focus-visible { outline: none; }
+  .card:has(a.card-link:focus-visible) { outline: 2px solid #2563eb; outline-offset: 2px; }
+  /* The other links and the tooltips stay above the title link. */
+  .card a:not(.card-link), .card [title] { position: relative; z-index: 1; }
   .card .strip { height: 4px; }
   .card .inner { padding: 10px 12px; display: flex; flex-direction: column; gap: 7px; flex: 1; }
   .card .repo { font-size: 12px; color: #6b7280; }
@@ -70,11 +76,11 @@
   <div class="hc"><span class="name">{{$g.Name}}</span><span class="cnt" style="background:{{$g.Color}}">{{len .Cards}}</span><span class="hint">{{$g.Hint}}</span></div>
   <div class="wrap">
   {{- range .Cards}}
-    <div class="card" data-url="{{.URL}}">
+    <article class="card">
       <div class="strip" style="background:{{$g.Color}}"></div>
       <div class="inner">
         {{- if $.ShowRepo}}<div class="repo">{{.Repo}}</div>{{end}}
-        <a class="t" href="{{.URL}}" target="_blank" rel="noopener">{{.Title}}</a>
+        <a class="t card-link" href="{{.URL}}" target="_blank" rel="noopener">{{.Title}}</a>
         <div class="labels">{{range .Labels}}<span class="lab {{tone .}}">{{.}}</span>{{end}}</div>
         <div class="foot">
           {{- if .StoryURL}}<a class="scid" href="{{.StoryURL}}" target="_blank" rel="noopener">sc-{{.StoryID}}</a>
@@ -99,20 +105,12 @@
           <span class="age">updated {{age .UpdatedAt}} ago</span>
         </div>
       </div>
-    </div>
+    </article>
   {{- else}}
     <div class="empty">nothing</div>
   {{- end}}
   </div>
 </section>
 {{end}}
-<script>
-  for (const card of document.querySelectorAll(".card[data-url]")) {
-    card.addEventListener("click", () => window.open(card.dataset.url, "_blank", "noopener"));
-  }
-  for (const link of document.querySelectorAll(".card a")) {
-    link.addEventListener("click", (e) => e.stopPropagation());
-  }
-</script>
 </body>
 </html>
