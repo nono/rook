@@ -68,8 +68,8 @@ func Find(ctx context.Context, proc string) ([]Session, error) {
 // lookup gives the repo and the branch of the checkout in dir: the upstream if
 // set, else the local branch on origin.
 func lookup(ctx context.Context, dir string) (repo, branch string, ok bool) {
-	ref, err := gitOut(ctx, dir, "symbolic-ref", "-q", "HEAD")
-	if err != nil {
+	ref, ok := headRef(ctx, dir)
+	if !ok {
 		return "", "", false
 	}
 	up, err := gitOut(ctx, dir, "for-each-ref", "--format=%(upstream:remotename)%09%(upstream:remoteref)", ref)
@@ -89,6 +89,26 @@ func lookup(ctx context.Context, dir string) (repo, branch string, ok bool) {
 		return "", "", false
 	}
 	return repo, strings.TrimPrefix(remoteRef, "refs/heads/"), true
+}
+
+// headRef gives the local branch of HEAD, such as "refs/heads/fix". A rebase
+// detaches HEAD: it then gives the branch under rebase.
+func headRef(ctx context.Context, dir string) (string, bool) {
+	if ref, err := gitOut(ctx, dir, "symbolic-ref", "-q", "HEAD"); err == nil {
+		return ref, true
+	}
+	for _, name := range []string{"rebase-merge/head-name", "rebase-apply/head-name"} {
+		path, err := gitOut(ctx, dir, "rev-parse", "--path-format=absolute", "--git-path", name)
+		if err != nil {
+			return "", false
+		}
+		if b, err := os.ReadFile(path); err == nil {
+			if ref := string(bytes.TrimSpace(b)); strings.HasPrefix(ref, "refs/heads/") {
+				return ref, true
+			}
+		}
+	}
+	return "", false
 }
 
 func gitOut(ctx context.Context, dir string, args ...string) (string, error) {

@@ -34,7 +34,7 @@ A session is a process whose `/proc/PID/comm` is `claude` and whose `/proc/PID/c
 
 For each cwd:
 
-1. Branch: if `HEAD` has an upstream (`@{upstream}`, such as `origin/sc-1234/fix`), the remote is the upstream's remote and the branch is the upstream's branch. Else the remote is `origin` and the branch is the local branch name. A detached `HEAD` gives no branch: no match.
+1. Branch: if `HEAD` has an upstream (`@{upstream}`, such as `origin/sc-1234/fix`), the remote is the upstream's remote and the branch is the upstream's branch. Else the remote is `origin` and the branch is the local branch name. A rebase that stops on a conflict detaches `HEAD`: the local branch is then the branch under rebase (`rebase-merge/head-name` or `rebase-apply/head-name` in the git dir). Another detached `HEAD` gives no branch: no match.
 2. Repo: the URL of that remote, as `owner/name`. Accept `git@github.com:owner/name(.git)`, `ssh://git@github.com/owner/name(.git)` and `https://github.com/owner/name(.git)`. Another host gives no match.
 3. Match: a PR matches when its repo and head branch are equal to the session's repo and branch. Repo names compare without case, branch names with case (git branch names depend on case).
 
@@ -73,7 +73,7 @@ The Claude logo goes in footer line 1, after the CI dot, on each card with a ses
 ## Tests
 
 - **board**: rule 5b; Review with a session stays Review ("not reviewed" etc.); Team with a session stays Team, with the logo; CI red and session → "CI red"; conflict and session → WIP "Claude"; no session → no change; repo match without case; branch match with case.
-- **sessions**: remote URL forms and other hosts; upstream branch with a name different from the local branch; no upstream; detached `HEAD`; cwd not in a repo; a fake `/proc` with `claude` and other processes.
+- **sessions**: remote URL forms and other hosts; upstream branch with a name different from the local branch; no upstream; detached `HEAD`; a rebase stopped on a conflict; cwd not in a repo; a fake `/proc` with `claude` and other processes.
 - **web**: the logo and its tooltip show when the card has a session, and not when it has none.
 - README: the new rule and a line on the sessions (Linux only).
 

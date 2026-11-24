@@ -131,6 +131,53 @@ func TestFind(t *testing.T) {
 	}
 }
 
+// A rebase that stops on a conflict detaches HEAD. The session stays on the
+// branch under rebase, with each rebase backend.
+func TestFindDuringRebase(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not in PATH")
+	}
+	for _, backend := range []string{"--merge", "--apply"} {
+		t.Run(backend, func(t *testing.T) {
+			dir := repo(t, "git@github.com:o/r.git", "fix")
+			upstream(t, dir, "fix", "origin", "sc-9/fix")
+			write := func(text string) {
+				if err := os.WriteFile(filepath.Join(dir, "f"), []byte(text), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				git(t, dir, "add", "f")
+				git(t, dir, "commit", "-q", "-m", text)
+			}
+			write("fix")
+			git(t, dir, "checkout", "-q", "main")
+			write("main")
+			git(t, dir, "checkout", "-q", "fix")
+			cmd := exec.Command("git", "-C", dir, "rebase", backend, "main")
+			cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null",
+				"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com")
+			if err := cmd.Run(); err == nil {
+				t.Fatal("rebase: want a conflict")
+			}
+			sub := filepath.Join(dir, "sub")
+			if err := os.Mkdir(sub, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			proc := t.TempDir()
+			process(t, proc, "10", "claude", dir)
+			process(t, proc, "11", "claude", sub)
+
+			got, err := Find(context.Background(), proc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := []Session{{Dir: dir, Repo: "o/r", Branch: "sc-9/fix"}, {Dir: sub, Repo: "o/r", Branch: "sc-9/fix"}}
+			if !reflect.DeepEqual(got, want) {
+				t.Fatalf("Find =\n%+v\nwant\n%+v", got, want)
+			}
+		})
+	}
+}
+
 func TestFindNoProc(t *testing.T) {
 	if _, err := Find(context.Background(), "/does/not/exist"); err == nil {
 		t.Fatal("Find on a missing /proc: want an error")
