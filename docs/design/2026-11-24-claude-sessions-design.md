@@ -32,15 +32,21 @@ When I work on one of my PRs with Claude Code, the card stays in Waiting. The wo
 
 A session is a process whose `/proc/PID/comm` is `claude` and whose `/proc/PID/cwd` Rook can read. In practice, those are the processes of the user that runs Rook.
 
-The cwd is the directory where the session started. It does not follow a `cd` in the session: Claude Code keeps the cwd of its shell in a file. So a session must start in the worktree of the PR.
+The cwd is the directory where the session started. A `cd` in a Bash command of the session does not move it: Claude Code keeps the cwd of its shell in a file. So a session must start in the worktree of the PR.
 
 For each cwd:
 
-1. Branch: if `HEAD` has an upstream (`@{upstream}`, such as `origin/sc-1234/fix`), the remote is the upstream's remote, and the session has two branch names: the upstream's branch, then the local branch name if it is different. A branch made from `origin/main` has the upstream `main` until a push with `-u`, so the local name is needed too. With no upstream, the remote is `origin` and the branch is the local branch name. Branch names keep all their bytes. A rebase that stops on a conflict detaches `HEAD`: the local branch is then the branch under rebase (`rebase-merge/head-name` or `rebase-apply/head-name` in the git dir). Another detached `HEAD` gives no branch: no match.
-2. Repo: the URL of that remote, as `owner/name`. Accept the scp-like form (`[user@]github.com:owner/name`) and the URLs (`ssh://`, `https://`), with a user, a port, a final `.git` or `/`, on the host `github.com` or `ssh.github.com`, in any case. Another host gives no match.
-3. Match: a PR matches when its repo is equal to the session's repo and its head branch is one of the session's branch names. The PR's repo is its current name (`nameWithOwner`): GitHub follows a rename, so a configured old name still gives the PRs, with the name that the remote of a new clone has. Repo names compare without case, branch names with case (git branch names depend on case).
+1. Branch: with no upstream, the remote is `origin` and the branch is the local branch name. With an upstream (`@{upstream}`, such as `origin/sc-1234/fix`), the remote is the upstream's remote, and the branch is:
+   - the local name, when the upstream has the same name;
+   - the local name, when the remote has a branch of that name (`refs/remotes/<remote>/<local>`): a branch made from `origin/main` and pushed without `-u` keeps the upstream `main`;
+   - the local name, when the upstream is the remote's default branch (`refs/remotes/<remote>/HEAD`): a new branch made from `origin/main`, not pushed yet, is not on the PRs whose head is `main`;
+   - else the upstream's name: a local name for a remote branch of another name.
 
-A cwd that is not in a git repo, a process that ends during the scan (also during its git calls), or a git error: skip that process. If a rebase ends between the read of `HEAD` and the read of the rebase files, read `HEAD` again. git runs without the variables of `git rev-parse --local-env-vars` (such as `GIT_DIR`), which would make it read another repo. If `/proc` cannot be read (not Linux) or `git` is not in the PATH, there are no sessions: log the error once at start, show no banner. The sessions never make the page fail. The scan of one page load stops after 1 s, so a hung git costs the page 1 s at most.
+   Branch names keep all their bytes. Branch names keep all their bytes. A rebase that stops on a conflict detaches `HEAD`: the local branch is then the branch under rebase (`rebase-merge/head-name` or `rebase-apply/head-name` in the git dir). Another detached `HEAD` gives no branch: no match.
+2. Repo: the URL of that remote, as `owner/name`. Accept the scp-like form (`[user@]github.com:owner/name`) and the URLs (`ssh://`, `https://`), with a user, a port, a final `.git` or `/`, on the host `github.com` or `ssh.github.com`, in any case. Another host gives no match.
+3. Match: a PR matches when the session's repo is equal to the configured name of the PR's repo or to its current name (`nameWithOwner`), and the session's branch is equal to the PR's head branch. GitHub follows a rename: a clone made before the rename has the old name in its remote URL, a new clone the new name. Repo names compare without case, branch names with case (git branch names depend on case).
+
+A cwd that is not in a git repo, a process that ends during the scan (also during its git calls), or a git error: skip that process. If a rebase ends between the read of `HEAD` and the read of the rebase files, read `HEAD` again. git runs without the variables of `git rev-parse --local-env-vars` (such as `GIT_DIR`), which would make it read another repo. If `/proc` cannot be read (not Linux) or `git` is not in the PATH, there are no sessions: log the error once at start, show no banner. The sessions never make the page fail. The scan of one page load stops after 1 s, and git then has 100 ms (`WaitDelay`) to give back its output, so a hung git costs the page about 1.1 s at most. The lookups of the directories run in parallel, so a git that hangs in one directory does not stop the others.
 
 Two sessions can match the same PR: the card keeps all the directories.
 

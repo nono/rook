@@ -7,13 +7,14 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/nono/rook/internal/board"
-	"github.com/nono/rook/internal/claude"
 	"github.com/nono/rook/internal/config"
 	"github.com/nono/rook/internal/github"
 )
@@ -106,15 +107,31 @@ type fetcher []github.PR
 
 func (f fetcher) OpenPRs(context.Context, string) ([]github.PR, error) { return f, nil }
 
-// The page source gives the sessions to the board.
-func TestNewSourceUsesSessions(t *testing.T) {
+// The page source finds the sessions in the proc root and gives them to the
+// board: a claude process in a checkout of branch x moves my PR to WIP.
+func TestNewSourceFindsSessions(t *testing.T) {
+	t.Setenv("GIT_CONFIG_GLOBAL", "/dev/null")
+	t.Setenv("GIT_CONFIG_SYSTEM", "/dev/null")
+	dir := t.TempDir()
+	for _, args := range [][]string{{"init", "-q", "-b", "x"}, {"remote", "add", "origin", "git@github.com:o/a.git"}} {
+		if out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	proc := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(proc, "10"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(proc, "10", "comm"), []byte("claude\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(dir, filepath.Join(proc, "10", "cwd")); err != nil {
+		t.Fatal(err)
+	}
 	p := github.PR{Repo: "o/a", Number: 1, HeadRefName: "x", Author: github.Actor{Login: "me"}, CIState: "SUCCESS", Mergeable: "MERGEABLE",
 		RequestedUsers: []github.Actor{{Login: "alice"}}}
-	sessions := func(context.Context) []claude.Session {
-		return []claude.Session{{Dir: "/w", Repo: "o/a", Branches: []string{"x"}}}
-	}
-	b := newSource(fetcher{p}, sessions, "me", config.Config{Repos: []string{"o/a"}})(context.Background())
-	if wip := b.Sections[1]; wip.Group != board.WIP || len(wip.Cards) != 1 || len(wip.Cards[0].SessionDirs) != 1 {
+	b := newSource(fetcher{p}, proc, t.Logf, "me", config.Config{Repos: []string{"o/a"}})(context.Background())
+	if wip := b.Sections[1]; wip.Group != board.WIP || len(wip.Cards) != 1 || !slices.Equal(wip.Cards[0].SessionDirs, []string{dir}) {
 		t.Fatalf("WIP = %+v", wip)
 	}
 }

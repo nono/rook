@@ -138,6 +138,16 @@ func TestFind(t *testing.T) {
 	upstream(t, e, "z", "fork", "z")
 	f := repo(t, "git@github.com:o/r.git", "w")
 	upstream(t, f, "w", "origin", "feature\u00a0")
+	// A new branch from origin/main, not pushed: the upstream is the default
+	// branch, so the session is on the local name, not on main.
+	g := repo(t, "git@github.com:o/r.git", "sc-1/new")
+	git(t, g, "update-ref", "refs/remotes/origin/main", "HEAD")
+	git(t, g, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+	upstream(t, g, "sc-1/new", "origin", "main")
+	// A branch from origin/main pushed without -u: the remote has its name.
+	h := repo(t, "git@github.com:o/r.git", "sc-2/x")
+	git(t, h, "update-ref", "refs/remotes/origin/sc-2/x", "HEAD")
+	upstream(t, h, "sc-2/x", "origin", "main")
 	plain := t.TempDir()
 	gone := filepath.Join(t.TempDir(), "gone")
 	if err := os.Mkdir(gone, 0o755); err != nil {
@@ -155,6 +165,8 @@ func TestFind(t *testing.T) {
 	process(t, proc, "18", "bash", a)
 	process(t, proc, "20", "claude", e)
 	process(t, proc, "21", "claude", f)
+	process(t, proc, "22", "claude", g)
+	process(t, proc, "23", "claude", h)
 	process(t, proc, "self", "claude", a)
 	process(t, proc, "19", "", a)
 	if err := os.Remove(gone); err != nil {
@@ -166,11 +178,13 @@ func TestFind(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []Session{
-		{Dir: a, Repo: "o/r", Branches: []string{"sc-1234/fix", "fix"}},
-		{Dir: sub, Repo: "o/r", Branches: []string{"sc-1234/fix", "fix"}},
-		{Dir: b, Repo: "o/r", Branches: []string{"feat"}},
-		{Dir: e, Repo: "o/f", Branches: []string{"z"}},
-		{Dir: f, Repo: "o/r", Branches: []string{"feature\u00a0", "w"}},
+		{Dir: a, Repo: "o/r", Branch: "sc-1234/fix"},
+		{Dir: sub, Repo: "o/r", Branch: "sc-1234/fix"},
+		{Dir: b, Repo: "o/r", Branch: "feat"},
+		{Dir: e, Repo: "o/f", Branch: "z"},
+		{Dir: f, Repo: "o/r", Branch: "feature\u00a0"},
+		{Dir: g, Repo: "o/r", Branch: "sc-1/new"},
+		{Dir: h, Repo: "o/r", Branch: "sc-2/x"},
 	}
 	slices.SortFunc(want, func(x, y Session) int { return strings.Compare(x.Dir, y.Dir) })
 	if !reflect.DeepEqual(got, want) {
@@ -184,8 +198,11 @@ func TestFindDuringRebase(t *testing.T) {
 	isolate(t)
 	for _, backend := range []string{"--merge", "--apply"} {
 		t.Run(backend, func(t *testing.T) {
-			dir := repo(t, "git@github.com:o/r.git", "fix")
-			upstream(t, dir, "fix", "origin", "sc-9/fix")
+			// The local name ends with a non-ASCII space, which the read of
+			// the rebase files must keep.
+			local := "fix\u00a0"
+			dir := repo(t, "git@github.com:o/r.git", local)
+			upstream(t, dir, local, "origin", "sc-9/fix")
 			write := func(text string) {
 				if err := os.WriteFile(filepath.Join(dir, "f"), []byte(text), 0o644); err != nil {
 					t.Fatal(err)
@@ -196,7 +213,7 @@ func TestFindDuringRebase(t *testing.T) {
 			write("fix")
 			git(t, dir, "checkout", "-q", "main")
 			write("main")
-			git(t, dir, "checkout", "-q", "fix")
+			git(t, dir, "checkout", "-q", local)
 			if err := exec.Command("git", "-C", dir, "rebase", backend, "main").Run(); err == nil {
 				t.Fatal("rebase: want a conflict")
 			}
@@ -212,7 +229,7 @@ func TestFindDuringRebase(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			want := []Session{{Dir: dir, Repo: "o/r", Branches: []string{"sc-9/fix", "fix"}}, {Dir: sub, Repo: "o/r", Branches: []string{"sc-9/fix", "fix"}}}
+			want := []Session{{Dir: dir, Repo: "o/r", Branch: "sc-9/fix"}, {Dir: sub, Repo: "o/r", Branch: "sc-9/fix"}}
 			if !reflect.DeepEqual(got, want) {
 				t.Fatalf("Find =\n%+v\nwant\n%+v", got, want)
 			}
@@ -237,7 +254,22 @@ func TestFindRebaseEndsBetweenReads(t *testing.T) {
 	mark := filepath.Join(t.TempDir(), "mark")
 	fakeGit(t, `if [ "$3" = symbolic-ref ] && [ ! -e `+mark+` ]; then touch `+mark+`; exit 1; fi`)
 	got, err := Find(context.Background(), proc)
-	if want := []Session{{Dir: dir, Repo: "o/r", Branches: []string{"fix"}}}; err != nil || !reflect.DeepEqual(got, want) {
+	if want := []Session{{Dir: dir, Repo: "o/r", Branch: "fix"}}; err != nil || !reflect.DeepEqual(got, want) {
+		t.Fatalf("Find = %+v, %v; want %+v", got, err, want)
+	}
+}
+
+// A git that hangs in one directory must not stop the lookup of the others.
+func TestFindHungGitSparesOtherDirs(t *testing.T) {
+	isolate(t)
+	hung := repo(t, "git@github.com:o/r.git", "other") // made first: sorted first
+	proc, dir := one(t)
+	process(t, proc, "11", "claude", hung)
+	fakeGit(t, `if [ "$2" = `+hung+` ]; then sleep 5; fi`)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	got, err := Find(ctx, proc)
+	if want := []Session{{Dir: dir, Repo: "o/r", Branch: "fix"}}; err != nil || !reflect.DeepEqual(got, want) {
 		t.Fatalf("Find = %+v, %v; want %+v", got, err, want)
 	}
 }
@@ -259,7 +291,7 @@ func TestFindIgnoresGitDir(t *testing.T) {
 	other := repo(t, "git@github.com:o/wrong.git", "unrelated")
 	t.Setenv("GIT_DIR", filepath.Join(other, ".git"))
 	got, err := Find(context.Background(), proc)
-	if want := []Session{{Dir: dir, Repo: "o/r", Branches: []string{"fix"}}}; err != nil || !reflect.DeepEqual(got, want) {
+	if want := []Session{{Dir: dir, Repo: "o/r", Branch: "fix"}}; err != nil || !reflect.DeepEqual(got, want) {
 		t.Fatalf("Find = %+v, %v; want %+v", got, err, want)
 	}
 }

@@ -136,7 +136,7 @@ Top bar: the time of the data, a Refresh button (reloads the page), and an error
   - **github**: one GraphQL query per repo, paginated (100 PRs per page), returns plain Go structs. Repos are fetched in parallel.
   - **board**: pure functions. Input: PRs and my login. Output: the groups with the cards and the reasons. Holds all the rules above.
   - **web**: the HTTP handler and the templates.
-- Field to fetch per repo: `nameWithOwner`, the current name of a renamed repo (for the Claude Code sessions).
+- Field to fetch per repo: `nameWithOwner`, the current name of a renamed repo. A Claude Code session matches the configured name or this one. The card and the error banner show the configured name.
 - Fields to fetch per PR: number, title, url, isDraft, updatedAt, headRefName, headRefOid, mergeable, isCrossRepository (for the Claude Code sessions), author (login, avatarUrl, `__typename`), reviewRequests (User login/avatar, Team and EnterpriseTeam slug), reviews (id, state, submittedAt, commit oid, author login/avatar/`__typename`), also the last 100 reviews of the user (`author` filter; the id removes the reviews found twice), and the PR `statusCheckRollup.state` (GitHub: the rollup of the PR's head ref; it matched the rollup of the last commit on 134 open fork PRs of two public repos). Reviews can exceed one page on busy PRs (one PR of the work repo has about 90): fetch the last 100, which holds the last review of each person in practice.
 - Each page load fetches fresh data. No cache.
 

@@ -100,7 +100,7 @@ func TestOpenPRsMapsFields(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := PR{
-		Repo: "o/r", Number: 11, Title: "[sc-1] First", URL: "https://github.com/o/r/pull/11",
+		Repo: "o/r", CurrentRepo: "o/r", Number: 11, Title: "[sc-1] First", URL: "https://github.com/o/r/pull/11",
 		UpdatedAt:   time.Date(2026, 11, 24, 8, 0, 0, 0, time.UTC),
 		HeadRefName: "me/sc-1-first", HeadOID: "h11", Mergeable: "MERGEABLE",
 		Author:         Actor{Login: "me", AvatarURL: "https://a/me"},
@@ -143,14 +143,14 @@ func TestOpenPRsNullAuthor(t *testing.T) {
 	}
 }
 
-// GitHub follows a rename: the PRs of a renamed repo carry its new name, so
-// that they match the remote URL of a new clone.
+// GitHub follows a rename: the PRs of a renamed repo keep the configured name,
+// and carry the current one, which the remote URL of a new clone has.
 func TestOpenPRsRenamedRepo(t *testing.T) {
 	c, _ := server(t, func(gqlRequest) (int, string) {
 		return 200, `{"data":{"repository":{"nameWithOwner":"o/new","pullRequests":{"pageInfo":{"hasNextPage":false},"nodes":[{"number":1}]}}}}`
 	})
 	prs, err := c.OpenPRs(context.Background(), "o/old")
-	if err != nil || len(prs) != 1 || prs[0].Repo != "o/new" {
+	if err != nil || len(prs) != 1 || prs[0].Repo != "o/old" || prs[0].CurrentRepo != "o/new" {
 		t.Fatalf("prs = %+v, err = %v", prs, err)
 	}
 }

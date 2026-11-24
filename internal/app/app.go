@@ -18,8 +18,9 @@ type Fetcher interface {
 	OpenPRs(ctx context.Context, repo string) ([]github.PR, error)
 }
 
-// sessionTimeout limits the scan of the sessions of one page load. A slow
-// git then costs the page one second at most.
+// sessionTimeout limits the scan of the sessions of one page load. A slow git
+// then costs the page about 1.1 s at most: this timeout, then the WaitDelay
+// of the git commands.
 var sessionTimeout = time.Second
 
 // Sessions gives the open Claude Code sessions.

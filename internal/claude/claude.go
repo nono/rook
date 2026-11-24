@@ -11,18 +11,15 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 )
 
 // Session is a Claude Code process and the branch checked out in its directory.
 type Session struct {
-	Dir  string // the cwd of the process
-	Repo string // "owner/name", as the remote URL gives it
-	// Branches are the names the PR branch can have on the remote, without
-	// "refs/heads/": the upstream's branch, then the local branch if its
-	// name differs. A branch made from origin/main has the upstream main
-	// until a push with -u, so the local name is needed too.
-	Branches []string
+	Dir    string // the cwd of the process
+	Repo   string // "owner/name", as the remote URL gives it
+	Branch string // the branch on the remote, without "refs/heads/"; see lookup
 }
 
 // repoOf gives the "owner/name" of a GitHub remote URL: scp-like
@@ -79,12 +76,25 @@ func Find(ctx context.Context, proc string) ([]Session, error) {
 		}
 		pids[cwd] = append(pids[cwd], e.Name())
 	}
+	// One lookup per directory, in parallel: a git that hangs in one
+	// directory must not use the time of the others.
+	dirs := slices.Sorted(maps.Keys(pids))
+	found := make([]*Session, len(dirs))
+	var wg sync.WaitGroup
+	for i, dir := range dirs {
+		wg.Go(func() {
+			repo, branch, ok := lookup(ctx, dir)
+			alive := slices.ContainsFunc(pids[dir], func(pid string) bool { return isClaude(proc, pid) })
+			if ok && alive {
+				found[i] = &Session{Dir: dir, Repo: repo, Branch: branch}
+			}
+		})
+	}
+	wg.Wait()
 	var out []Session
-	for _, dir := range slices.Sorted(maps.Keys(pids)) {
-		repo, branches, ok := lookup(ctx, dir)
-		alive := slices.ContainsFunc(pids[dir], func(pid string) bool { return isClaude(proc, pid) })
-		if ok && alive {
-			out = append(out, Session{Dir: dir, Repo: repo, Branches: branches})
+	for _, s := range found {
+		if s != nil {
+			out = append(out, *s)
 		}
 	}
 	return out, nil
@@ -96,35 +106,43 @@ func isClaude(proc, pid string) bool {
 	return err == nil && strings.TrimSuffix(string(comm), "\n") == "claude"
 }
 
-// lookup gives the repo and the branch names of the checkout in dir: the
-// upstream's remote and branch, then the local branch; with no upstream,
-// origin and the local branch.
-func lookup(ctx context.Context, dir string) (repo string, branches []string, ok bool) {
+// lookup gives the repo and the remote branch of the checkout in dir. With no
+// upstream, it is the local branch on origin. With an upstream, the remote is
+// the upstream's, and the branch is:
+//   - the local name, when the remote has a branch of that name (a push
+//     without -u), or when the upstream is the remote's default branch (a new
+//     branch made from origin/main, not pushed yet);
+//   - else the upstream's name (a local name for a remote branch).
+func lookup(ctx context.Context, dir string) (repo, branch string, ok bool) {
 	ref, ok := headRef(ctx, dir)
 	if !ok {
-		return "", nil, false
+		return "", "", false
 	}
 	up, err := gitOut(ctx, dir, "for-each-ref", "--format=%(upstream:remotename)%09%(upstream:remoteref)", ref)
 	if err != nil {
-		return "", nil, false
+		return "", "", false
 	}
+	local := strings.TrimPrefix(ref, "refs/heads/")
 	remote, remoteRef, _ := strings.Cut(up, "\t")
-	if remote == "" {
-		remote, remoteRef = "origin", ref
+	branch = strings.TrimPrefix(remoteRef, "refs/heads/")
+	switch {
+	case remote == "":
+		remote, branch = "origin", local
+	case branch != local:
+		if _, err := gitOut(ctx, dir, "rev-parse", "-q", "--verify", "refs/remotes/"+remote+"/"+local); err == nil {
+			branch = local
+		} else if head, err := gitOut(ctx, dir, "symbolic-ref", "-q", "refs/remotes/"+remote+"/HEAD"); err == nil && head == "refs/remotes/"+remote+"/"+branch {
+			branch = local
+		}
 	}
 	url, err := gitOut(ctx, dir, "remote", "get-url", remote)
 	if err != nil {
-		return "", nil, false
+		return "", "", false
 	}
-	repo, ok = repoOf(url)
-	if !ok {
-		return "", nil, false
+	if repo, ok = repoOf(url); !ok {
+		return "", "", false
 	}
-	branches = []string{strings.TrimPrefix(remoteRef, "refs/heads/")}
-	if local := strings.TrimPrefix(ref, "refs/heads/"); local != branches[0] {
-		branches = append(branches, local)
-	}
-	return repo, branches, true
+	return repo, branch, true
 }
 
 // headRef gives the local branch of HEAD, such as "refs/heads/fix". A rebase

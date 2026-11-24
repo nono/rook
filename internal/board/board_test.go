@@ -138,10 +138,10 @@ func TestBuildSessions(t *testing.T) {
 	}
 
 	secs := Build([]github.PR{p1, p2}, Options{Me: "me", Sessions: []claude.Session{
-		{Dir: "/w/1", Repo: "O/R", Branches: []string{"sc-1/a"}},
-		{Dir: "/w/2", Repo: "o/r", Branches: []string{"main", "sc-1/a"}},
-		{Dir: "/w/3", Repo: "o/r", Branches: []string{"B"}},
-		{Dir: "/w/4", Repo: "o/x", Branches: []string{"b"}},
+		{Dir: "/w/1", Repo: "O/R", Branch: "sc-1/a"},
+		{Dir: "/w/2", Repo: "o/r", Branch: "sc-1/a"},
+		{Dir: "/w/3", Repo: "o/r", Branch: "B"},
+		{Dir: "/w/4", Repo: "o/x", Branch: "b"},
 	}})
 	g, c := find(secs, 1)
 	if g != WIP || !reflect.DeepEqual(c.Labels, []string{"Claude"}) || !reflect.DeepEqual(c.SessionDirs, []string{"/w/1", "/w/2"}) {
@@ -151,21 +151,31 @@ func TestBuildSessions(t *testing.T) {
 		t.Errorf("p2: group %s, SessionDirs %q; want team, nil", g, c.SessionDirs)
 	}
 
-	secs = Build([]github.PR{p2}, Options{Me: "me", Sessions: []claude.Session{{Dir: "/w/5", Repo: "o/r", Branches: []string{"b"}}}})
+	secs = Build([]github.PR{p2}, Options{Me: "me", Sessions: []claude.Session{{Dir: "/w/5", Repo: "o/r", Branch: "b"}}})
 	if g, c := find(secs, 2); g != Team || !reflect.DeepEqual(c.SessionDirs, []string{"/w/5"}) {
 		t.Errorf("p2 with session: group %s, SessionDirs %q; want team, [/w/5]", g, c.SessionDirs)
 	}
 
 	// A CI-red PR keeps its label and gets the session directories.
 	red := pr(mine, requested("alice"), head("sc-1/a"), ci("FAILURE"), func(p *github.PR) { p.Number = 4 })
-	secs = Build([]github.PR{red}, Options{Me: "me", Sessions: []claude.Session{{Dir: "/w/7", Repo: "o/r", Branches: []string{"sc-1/a"}}}})
+	secs = Build([]github.PR{red}, Options{Me: "me", Sessions: []claude.Session{{Dir: "/w/7", Repo: "o/r", Branch: "sc-1/a"}}})
 	if g, c := find(secs, 4); g != WIP || !reflect.DeepEqual(c.Labels, []string{"CI red"}) || !reflect.DeepEqual(c.SessionDirs, []string{"/w/7"}) {
 		t.Errorf("CI-red PR: group %s, card %+v", g, c)
 	}
 
+	// A renamed repo: a session matches the configured name (an old clone)
+	// and the current name (a new clone).
+	renamed := pr(mine, requested("alice"), head("x"), func(p *github.PR) { p.Number = 5; p.Repo = "o/old"; p.CurrentRepo = "o/new" })
+	secs = Build([]github.PR{renamed}, Options{Me: "me", Sessions: []claude.Session{
+		{Dir: "/w/old", Repo: "o/old", Branch: "x"}, {Dir: "/w/new", Repo: "o/new", Branch: "x"}, {Dir: "/w/x", Repo: "o/x", Branch: "x"},
+	}})
+	if g, c := find(secs, 5); g != WIP || !reflect.DeepEqual(c.SessionDirs, []string{"/w/old", "/w/new"}) {
+		t.Errorf("renamed repo: group %s, SessionDirs %q; want wip, [/w/old /w/new]", g, c.SessionDirs)
+	}
+
 	// The head branch of a fork PR is in the fork, not in the repo of the session.
 	fork := pr(mine, requested("alice"), head("main"), func(p *github.PR) { p.Number = 3; p.Fork = true })
-	secs = Build([]github.PR{fork}, Options{Me: "me", Sessions: []claude.Session{{Dir: "/w/6", Repo: "o/r", Branches: []string{"main"}}}})
+	secs = Build([]github.PR{fork}, Options{Me: "me", Sessions: []claude.Session{{Dir: "/w/6", Repo: "o/r", Branch: "main"}}})
 	if g, c := find(secs, 3); g != Waiting || c.SessionDirs != nil {
 		t.Errorf("fork PR: group %s, SessionDirs %q; want waiting, nil", g, c.SessionDirs)
 	}

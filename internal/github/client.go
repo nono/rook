@@ -156,10 +156,13 @@ func (c *Client) OpenPRs(ctx context.Context, repo string) ([]PR, error) {
 			return nil, fmt.Errorf("%s: repository not found", repo)
 		}
 		page := out.Repository.PullRequests
-		// GitHub follows a rename: the current name matches the remote of a new clone.
+		// GitHub follows a rename: an old clone has the configured name in
+		// its remote URL, a new clone the current name.
 		current := cmp.Or(out.Repository.NameWithOwner, repo)
 		for _, n := range page.Nodes {
-			prs = append(prs, n.pr(current))
+			p := n.pr(repo)
+			p.CurrentRepo = current
+			prs = append(prs, p)
 		}
 		if !page.PageInfo.HasNextPage {
 			return prs, nil

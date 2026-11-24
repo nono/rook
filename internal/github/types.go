@@ -24,7 +24,8 @@ type Review struct {
 
 // PR is an open pull request.
 type PR struct {
-	Repo        string // "owner/name"
+	Repo        string // "owner/name", as configured
+	CurrentRepo string // "owner/name" after a rename (GitHub follows renames), else Repo
 	Number      int
 	Title       string
 	URL         string

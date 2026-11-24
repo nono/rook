@@ -84,7 +84,7 @@ func serve(ctx context.Context, cfgPath string) error {
 		return err
 	}
 	client.Me = me
-	src := newSource(client, sessionSource("/proc", log.Printf), me, cfg)
+	src := newSource(client, "/proc", log.Printf, me, cfg)
 	ln, err := net.Listen("tcp", cfg.Listen)
 	if err != nil {
 		return err
@@ -93,8 +93,10 @@ func serve(ctx context.Context, cfgPath string) error {
 	return serveHTTP(ctx, ln, web.NewHandler(src, time.Now, icon))
 }
 
-// newSource gives the board of each page load, within loadTimeout.
-func newSource(f app.Fetcher, sessions app.Sessions, me string, cfg config.Config) web.Source {
+// newSource gives the board of each page load, within loadTimeout, with the
+// Claude Code sessions of the processes in proc.
+func newSource(f app.Fetcher, proc string, logf func(format string, args ...any), me string, cfg config.Config) web.Source {
+	sessions := sessionSource(proc, logf)
 	return func(ctx context.Context) board.Board {
 		ctx, cancel := context.WithTimeout(ctx, loadTimeout)
 		defer cancel()

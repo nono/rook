@@ -125,7 +125,7 @@ func TestLoadUsesSessions(t *testing.T) {
 	p.HeadRefName = "x"
 	p.RequestedUsers = []github.Actor{{Login: "alice"}}
 	sessions := func(context.Context) []claude.Session {
-		return []claude.Session{{Dir: "/w", Repo: "o/a", Branches: []string{"x"}}}
+		return []claude.Session{{Dir: "/w", Repo: "o/a", Branch: "x"}}
 	}
 	b := Load(context.Background(), fake{"o/a": {p}}, sessions, "me", config.Config{Repos: []string{"o/a"}}, time.Now)
 	wip := b.Sections[1]
