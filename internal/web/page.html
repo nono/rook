@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rook</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px 20px; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: #fff; color: #1f2937; }
+  .bar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .bar h1 { font-size: 20px; margin: 0; }
+  .bar .when { color: #6b7280; font-size: 14px; }
+  .bar button { margin-left: auto; font: inherit; font-size: 14px; padding: 4px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; cursor: pointer; }
+  .bar button:hover { background: #f3f4f6; }
+  .err { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; border-radius: 6px; padding: 6px 10px; margin-bottom: 8px; font-size: 14px; }
+
+  section { background: #eef1f5; border-radius: 8px; padding: 8px; margin-bottom: 10px; }
+  .hc { display: flex; align-items: center; gap: 8px; padding: 2px 4px; }
+  .hc .name { font-size: 16px; font-weight: 700; color: #1f2937; }
+  .hc .cnt { color: #fff; font-size: 12px; font-weight: 700; border-radius: 10px; padding: 1px 8px; }
+  .hc .hint { color: #9ca3af; font-size: 13px; margin-left: 4px; }
+  .wrap { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; align-items: stretch; }
+  .empty { color: #999; font-size: 14px; padding: 8px; font-style: italic; }
+  .sp { flex: 1; }
+
+  .card { display: flex; flex-direction: column; width: 310px; background: #fff; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.12); font-size: 14px; color: #1f2937; cursor: pointer; }
+  .card:hover { box-shadow: 0 3px 8px rgba(0,0,0,.18); }
+  .card .strip { height: 4px; }
+  .card .inner { padding: 10px 12px; display: flex; flex-direction: column; gap: 7px; flex: 1; }
+  .card .repo { font-size: 12px; color: #6b7280; }
+  .card .t { font-weight: 600; line-height: 1.4; flex: 1; color: inherit; text-decoration: none; }
+  .card .t:hover { text-decoration: underline; }
+  .labels:empty { display: none; }
+  .lab { display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; border-radius: 3px; padding: 2px 6px; margin-right: 4px; }
+  .red { background: #fdd; color: #900; } .ylw { background: #ffefc2; color: #850; } .gry { background: #eee; color: #555; }
+  .foot { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #6b7280; border-top: 1px solid #f0f0f0; padding-top: 7px; }
+  .scid { font-family: ui-monospace, monospace; font-weight: 700; color: #5b21b6; text-decoration: none; }
+  a.scid:hover { text-decoration: underline; }
+  .foot2 { display: flex; align-items: center; font-size: 12px; color: #6b7280; }
+  .owner { display: inline-flex; align-items: center; gap: 5px; } .owner.me { color: #9ca3af; }
+
+  .ci { font-size: 13px; } .ci.green { color: #16a34a; } .ci.red { color: #dc2626; } .ci.pending { color: #ca8a04; } .ci.none { color: #9ca3af; }
+  .avs { display: inline-flex; gap: 3px; align-items: center; }
+  .avw { position: relative; display: inline-block; line-height: 0; }
+  .av { border-radius: 50%; background: #ddd; }
+  .avw.requested .av { opacity: .45; outline: 1.5px dashed #9ca3af; outline-offset: 1px; }
+  .avw.commented .av { outline: 2px solid #cbd5e1; }
+  .avw.approved .av { outline: 2px solid #16a34a; }
+  .avw.changes .av { outline: 2px solid #dc2626; }
+  .mk { position: absolute; right: -4px; bottom: -3px; width: 12px; height: 12px; border-radius: 50%; font-size: 9px; line-height: 12px; text-align: center; color: #fff; font-weight: 700; }
+  .mk.ok { background: #16a34a; } .mk.ko { background: #dc2626; }
+  .team { font-size: 11px; color: #6b7280; background: #f3f4f6; border: 1px dashed #9ca3af; border-radius: 9px; padding: 0 6px; line-height: 18px; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <h1>Rook</h1>
+  <span class="when">Data from {{.FetchedAt.Local.Format "15:04:05"}}</span>
+  <button type="button" onclick="location.reload()">Refresh</button>
+</div>
+{{range .Errors}}<div class="err">{{.Repo}}: {{.Err}}</div>
+{{end}}
+{{range .Sections}}
+<section id="g-{{.Group}}">
+  <div class="hc"><span class="name">{{.Name}}</span><span class="cnt" style="background:{{.Color}}">{{len .Cards}}</span><span class="hint">{{.Hint}}</span></div>
+  <div class="wrap">
+  {{- $color := .Color}}
+  {{- range .Cards}}
+    <div class="card" data-url="{{.URL}}">
+      <div class="strip" style="background:{{$color}}"></div>
+      <div class="inner">
+        {{- if .ShowRepo}}<div class="repo">{{.Repo}}</div>{{end}}
+        <a class="t" href="{{.URL}}" target="_blank" rel="noopener">{{.Title}}</a>
+        <div class="labels">{{range .Labels}}<span class="lab {{.Tone}}">{{.Text}}</span>{{end}}</div>
+        <div class="foot">
+          {{- if .StoryURL}}<a class="scid" href="{{.StoryURL}}" target="_blank" rel="noopener">sc-{{.StoryID}}</a>
+          {{- else if .StoryID}}<span class="scid">sc-{{.StoryID}}</span>{{end}}
+          <span class="num">#{{.Number}}</span>
+          <span class="ci {{.CI}}" title="CI {{.CI}}">{{ciIcon .CI}}</span>
+          <span class="sp"></span>
+          <span class="avs">
+          {{- range .Reviewers}}
+            {{- if .Team}}<span class="team" title="{{.Login}}: review requested">{{.Login}}</span>
+            {{- else}}<span class="avw {{.State}}" title="{{.Login}}: {{stateWord .State}}"><img class="av" width="22" height="22" src="{{.AvatarURL}}" alt="{{.Login}}">
+              {{- if eq (print .State) "approved"}}<span class="mk ok">✓</span>{{else if eq (print .State) "changes"}}<span class="mk ko">✗</span>{{end}}</span>
+            {{- end}}
+          {{- end}}
+          </span>
+        </div>
+        <div class="foot2">
+          {{- if .Mine}}<span class="owner me">mine</span>
+          {{- else}}<span class="owner"><span class="avw"><img class="av" width="22" height="22" src="{{.Author.AvatarURL}}" alt="{{.Author.Login}}"></span> {{.Author.Login}}</span>{{end}}
+          <span class="sp"></span>
+          <span class="age">updated {{age .UpdatedAt}} ago</span>
+        </div>
+      </div>
+    </div>
+  {{- else}}
+    <div class="empty">nothing</div>
+  {{- end}}
+  </div>
+</section>
+{{end}}
+<script>
+  for (const card of document.querySelectorAll(".card[data-url]")) {
+    card.addEventListener("click", () => window.open(card.dataset.url, "_blank", "noopener"));
+  }
+  for (const link of document.querySelectorAll(".card a")) {
+    link.addEventListener("click", (e) => e.stopPropagation());
+  }
+</script>
+</body>
+</html>
