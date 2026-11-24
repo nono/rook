@@ -59,6 +59,13 @@ func TestGhTokenAsksForGitHubCom(t *testing.T) {
 	}
 }
 
+// serve reads the sessions in procRoot; another root finds none.
+func TestProcRootIsProc(t *testing.T) {
+	if procRoot != "/proc" {
+		t.Fatalf("procRoot = %q, want /proc", procRoot)
+	}
+}
+
 // The spec asks for a page in a few seconds: one stalled repo must not hold it longer.
 func TestLoadTimeoutIsAFewSeconds(t *testing.T) {
 	if loadTimeout > 10*time.Second {
@@ -110,6 +117,18 @@ func (f fetcher) OpenPRs(context.Context, string) ([]github.PR, error) { return 
 // The page source finds the sessions in the proc root and gives them to the
 // board: a claude process in a checkout of branch x moves my PR to WIP.
 func TestNewSourceFindsSessions(t *testing.T) {
+	// Run from a git hook, the environment names the repo of the hook: git
+	// must not use it.
+	vars, err := exec.Command("git", "rev-parse", "--local-env-vars").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, v := range strings.Fields(string(vars)) {
+		t.Setenv(v, "")
+		if err := os.Unsetenv(v); err != nil {
+			t.Fatal(err)
+		}
+	}
 	t.Setenv("GIT_CONFIG_GLOBAL", "/dev/null")
 	t.Setenv("GIT_CONFIG_SYSTEM", "/dev/null")
 	dir := t.TempDir()

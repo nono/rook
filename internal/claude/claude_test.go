@@ -131,23 +131,23 @@ func TestFind(t *testing.T) {
 	b := repo(t, "https://github.com/o/r", "feat")
 	c := repo(t, "git@github.com:o/r.git", "x")
 	git(t, c, "checkout", "-q", "--detach")
+	// An upstream on the local repo (remote "."): the branch is on origin.
 	d := repo(t, "git@github.com:o/r.git", "y")
 	upstream(t, d, "y", ".", "main")
+	// A branch name that ends with a non-ASCII space keeps it.
+	n := repo(t, "git@github.com:o/r.git", "nbsp\u00a0")
 	e := repo(t, "git@github.com:o/r.git", "z")
 	git(t, e, "remote", "add", "fork", "git@github.com:o/f.git")
 	upstream(t, e, "z", "fork", "z")
 	f := repo(t, "git@github.com:o/r.git", "w")
-	upstream(t, f, "w", "origin", "feature\u00a0")
-	// A new branch from origin/main, not pushed: the upstream is the default
-	// branch, so the session is on the local name, not on main.
+	upstream(t, f, "w", "origin", "feature")
+	// A branch made from origin/main keeps the upstream main until a push
+	// with -u; the session is on the local name, not on main.
 	g := repo(t, "git@github.com:o/r.git", "sc-1/new")
-	git(t, g, "update-ref", "refs/remotes/origin/main", "HEAD")
-	git(t, g, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
 	upstream(t, g, "sc-1/new", "origin", "main")
-	// A branch from origin/main pushed without -u: the remote has its name.
-	h := repo(t, "git@github.com:o/r.git", "sc-2/x")
-	git(t, h, "update-ref", "refs/remotes/origin/sc-2/x", "HEAD")
-	upstream(t, h, "sc-2/x", "origin", "main")
+	// A stacked branch made from origin/sc-1/a, not pushed: not on sc-1/a.
+	h := repo(t, "git@github.com:o/r.git", "sc-2/b")
+	upstream(t, h, "sc-2/b", "origin", "sc-1/a")
 	plain := t.TempDir()
 	gone := filepath.Join(t.TempDir(), "gone")
 	if err := os.Mkdir(gone, 0o755); err != nil {
@@ -167,6 +167,7 @@ func TestFind(t *testing.T) {
 	process(t, proc, "21", "claude", f)
 	process(t, proc, "22", "claude", g)
 	process(t, proc, "23", "claude", h)
+	process(t, proc, "24", "claude", n)
 	process(t, proc, "self", "claude", a)
 	process(t, proc, "19", "", a)
 	if err := os.Remove(gone); err != nil {
@@ -177,14 +178,17 @@ func TestFind(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The branch is the local name; the upstream gives only the remote.
 	want := []Session{
-		{Dir: a, Repo: "o/r", Branch: "sc-1234/fix"},
-		{Dir: sub, Repo: "o/r", Branch: "sc-1234/fix"},
+		{Dir: a, Repo: "o/r", Branch: "fix"},
+		{Dir: sub, Repo: "o/r", Branch: "fix"},
 		{Dir: b, Repo: "o/r", Branch: "feat"},
+		{Dir: d, Repo: "o/r", Branch: "y"},
 		{Dir: e, Repo: "o/f", Branch: "z"},
-		{Dir: f, Repo: "o/r", Branch: "feature\u00a0"},
+		{Dir: f, Repo: "o/r", Branch: "w"},
 		{Dir: g, Repo: "o/r", Branch: "sc-1/new"},
-		{Dir: h, Repo: "o/r", Branch: "sc-2/x"},
+		{Dir: h, Repo: "o/r", Branch: "sc-2/b"},
+		{Dir: n, Repo: "o/r", Branch: "nbsp\u00a0"},
 	}
 	slices.SortFunc(want, func(x, y Session) int { return strings.Compare(x.Dir, y.Dir) })
 	if !reflect.DeepEqual(got, want) {
@@ -229,7 +233,7 @@ func TestFindDuringRebase(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			want := []Session{{Dir: dir, Repo: "o/r", Branch: "sc-9/fix"}, {Dir: sub, Repo: "o/r", Branch: "sc-9/fix"}}
+			want := []Session{{Dir: dir, Repo: "o/r", Branch: local}, {Dir: sub, Repo: "o/r", Branch: local}}
 			if !reflect.DeepEqual(got, want) {
 				t.Fatalf("Find =\n%+v\nwant\n%+v", got, want)
 			}

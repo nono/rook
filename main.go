@@ -84,7 +84,7 @@ func serve(ctx context.Context, cfgPath string) error {
 		return err
 	}
 	client.Me = me
-	src := newSource(client, "/proc", log.Printf, me, cfg)
+	src := newSource(client, procRoot, log.Printf, me, cfg)
 	ln, err := net.Listen("tcp", cfg.Listen)
 	if err != nil {
 		return err
@@ -92,6 +92,9 @@ func serve(ctx context.Context, cfgPath string) error {
 	log.Printf("rook: http://%s/ (user %s)", ln.Addr(), me)
 	return serveHTTP(ctx, ln, web.NewHandler(src, time.Now, icon))
 }
+
+// procRoot is where serve finds the Claude Code processes.
+const procRoot = "/proc"
 
 // newSource gives the board of each page load, within loadTimeout, with the
 // Claude Code sessions of the processes in proc.

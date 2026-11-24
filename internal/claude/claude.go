@@ -19,7 +19,7 @@ import (
 type Session struct {
 	Dir    string // the cwd of the process
 	Repo   string // "owner/name", as the remote URL gives it
-	Branch string // the branch on the remote, without "refs/heads/"; see lookup
+	Branch string // the local branch, without "refs/heads/": the PR head must have this name
 }
 
 // repoOf gives the "owner/name" of a GitHub remote URL: scp-like
@@ -106,34 +106,22 @@ func isClaude(proc, pid string) bool {
 	return err == nil && strings.TrimSuffix(string(comm), "\n") == "claude"
 }
 
-// lookup gives the repo and the remote branch of the checkout in dir. With no
-// upstream, it is the local branch on origin. With an upstream, the remote is
-// the upstream's, and the branch is:
-//   - the local name, when the remote has a branch of that name (a push
-//     without -u), or when the upstream is the remote's default branch (a new
-//     branch made from origin/main, not pushed yet);
-//   - else the upstream's name (a local name for a remote branch).
+// lookup gives the repo and the local branch of the checkout in dir. The PR
+// head must have the name of the local branch: the upstream's branch name is
+// not used, because a branch made from origin/main, or from the branch of
+// another PR, keeps that upstream until a push with -u. The remote is the
+// upstream's, else origin (also for an upstream on the local repo, ".").
 func lookup(ctx context.Context, dir string) (repo, branch string, ok bool) {
 	ref, ok := headRef(ctx, dir)
 	if !ok {
 		return "", "", false
 	}
-	up, err := gitOut(ctx, dir, "for-each-ref", "--format=%(upstream:remotename)%09%(upstream:remoteref)", ref)
+	remote, err := gitOut(ctx, dir, "for-each-ref", "--format=%(upstream:remotename)", ref)
 	if err != nil {
 		return "", "", false
 	}
-	local := strings.TrimPrefix(ref, "refs/heads/")
-	remote, remoteRef, _ := strings.Cut(up, "\t")
-	branch = strings.TrimPrefix(remoteRef, "refs/heads/")
-	switch {
-	case remote == "":
-		remote, branch = "origin", local
-	case branch != local:
-		if _, err := gitOut(ctx, dir, "rev-parse", "-q", "--verify", "refs/remotes/"+remote+"/"+local); err == nil {
-			branch = local
-		} else if head, err := gitOut(ctx, dir, "symbolic-ref", "-q", "refs/remotes/"+remote+"/HEAD"); err == nil && head == "refs/remotes/"+remote+"/"+branch {
-			branch = local
-		}
+	if remote == "" || remote == "." {
+		remote = "origin"
 	}
 	url, err := gitOut(ctx, dir, "remote", "get-url", remote)
 	if err != nil {
@@ -142,7 +130,7 @@ func lookup(ctx context.Context, dir string) (repo, branch string, ok bool) {
 	if repo, ok = repoOf(url); !ok {
 		return "", "", false
 	}
-	return repo, branch, true
+	return repo, strings.TrimPrefix(ref, "refs/heads/"), true
 }
 
 // headRef gives the local branch of HEAD, such as "refs/heads/fix". A rebase
