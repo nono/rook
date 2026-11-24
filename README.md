@@ -16,10 +16,13 @@ For your own PRs, drafts included:
 
 4. **WIP**: the CI is red or pending.
 5. **WIP**: no review is requested from a person or a team, and no person reviewed it ("no reviewer").
-6. **Conflict**: the PR has a git conflict.
-7. **Waiting**: all the other PRs.
+6. **WIP**: a Claude Code session is open on the PR's branch ("Claude").
+7. **Conflict**: the PR has a git conflict.
+8. **Waiting**: all the other PRs.
 
 Your verdict is your last review that approves or requests changes. A reply in a review thread does not change it. Reviews by bots, by the PR author and by the logins in `ignore_reviewers` do not count.
+
+A Claude Code session is a `claude` process whose directory is a git checkout of the PR's repo and branch (the upstream branch, if set). An open session counts, idle or not. A session never moves a PR that you did not author, but each card with a session shows the Claude logo. This works on Linux only.
 
 ## Install
 

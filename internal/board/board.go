@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nono/rook/internal/claude"
 	"github.com/nono/rook/internal/github"
 )
 
@@ -71,6 +72,7 @@ type Card struct {
 	Mine      bool
 	Reviewers []Reviewer
 	UpdatedAt time.Time
+	Claude    []string // the directories of the Claude Code sessions on the PR's branch
 }
 
 // Section is a group with its cards.
@@ -98,6 +100,7 @@ type Options struct {
 	Me                string
 	ShortcutWorkspace string
 	Ignore            []string
+	Sessions          []claude.Session
 }
 
 // ciOf maps a statusCheckRollup state to a CI state. An unknown state is
@@ -134,7 +137,8 @@ func sortedReviews(pr github.PR) []github.Review {
 }
 
 // classify gives the group of a PR and the reason label ("" for team and waiting).
-func classify(pr github.PR, opts Options) (Group, string) {
+// session tells that a Claude Code session is open on the PR's branch.
+func classify(pr github.PR, opts Options, session bool) (Group, string) {
 	if pr.Author.Login != opts.Me {
 		var last *github.Review
 		verdict := ""
@@ -169,6 +173,9 @@ func classify(pr github.PR, opts Options) (Group, string) {
 		slices.ContainsFunc(pr.RequestedUsers, func(a github.Actor) bool { return person(a, opts) })
 	if !hasRequest && !hasHuman {
 		return WIP, "no reviewer"
+	}
+	if session {
+		return WIP, "Claude"
 	}
 	if pr.Mergeable == "CONFLICTING" {
 		return Conflict, "conflict"
@@ -232,17 +239,31 @@ func storyID(title, branch string) (id, cleanTitle string) {
 	return "", title
 }
 
+// sessionDirs gives the directories of the sessions on the repo and head branch
+// of the PR. GitHub repo names do not depend on case; git branch names do.
+func sessionDirs(pr github.PR, sessions []claude.Session) []string {
+	var dirs []string
+	for _, s := range sessions {
+		if strings.EqualFold(s.Repo, pr.Repo) && s.Branch == pr.HeadRefName {
+			dirs = append(dirs, s.Dir)
+		}
+	}
+	return dirs
+}
+
 // Build sorts the PRs into the five sections, in display order, newest first in each.
 func Build(prs []github.PR, opts Options) []Section {
 	byGroup := map[Group][]Card{}
 	for _, pr := range prs {
-		g, reason := classify(pr, opts)
+		dirs := sessionDirs(pr, opts.Sessions)
+		g, reason := classify(pr, opts, len(dirs) > 0)
 		id, title := storyID(pr.Title, pr.HeadRefName)
 		c := Card{
 			Kind: "pr", Repo: pr.Repo, Number: pr.Number,
 			Title: title, URL: pr.URL, StoryID: id, CI: ciOf(pr.CIState),
 			Author: pr.Author, Mine: pr.Author.Login == opts.Me,
 			Reviewers: reviewers(pr, opts), UpdatedAt: pr.UpdatedAt,
+			Claude: dirs,
 		}
 		if id != "" && opts.ShortcutWorkspace != "" {
 			c.StoryURL = "https://app.shortcut.com/" + opts.ShortcutWorkspace + "/story/" + id

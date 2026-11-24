@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nono/rook/internal/claude"
 	"github.com/nono/rook/internal/github"
 )
 
@@ -88,11 +89,71 @@ func TestClassify(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			g, reason := classify(c.pr, Options{Me: "me", Ignore: c.ignore})
+			g, reason := classify(c.pr, Options{Me: "me", Ignore: c.ignore}, false)
 			if g != c.group || reason != c.reason {
 				t.Fatalf("got (%s, %q), want (%s, %q)", g, reason, c.group, c.reason)
 			}
 		})
+	}
+}
+
+func TestClassifyClaude(t *testing.T) {
+	cases := []struct {
+		name   string
+		pr     github.PR
+		group  Group
+		reason string
+	}{
+		{"mine: session, waiting", pr(mine, requested("alice")), WIP, "Claude"},
+		{"mine: session + CONFLICTING", pr(mine, requested("alice"), mergeable("CONFLICTING")), WIP, "Claude"},
+		{"mine: session + CI red", pr(mine, requested("alice"), ci("FAILURE")), WIP, "CI red"},
+		{"mine: session + no reviewer", pr(mine), WIP, "no reviewer"},
+		{"session, requested from me", pr(requested("me")), Review, "not reviewed"},
+		{"session, someone else's PR", pr(), Team, ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			g, reason := classify(c.pr, Options{Me: "me"}, true)
+			if g != c.group || reason != c.reason {
+				t.Fatalf("got (%s, %q), want (%s, %q)", g, reason, c.group, c.reason)
+			}
+		})
+	}
+}
+
+func TestBuildSessions(t *testing.T) {
+	head := func(b string) func(*github.PR) { return func(p *github.PR) { p.HeadRefName = b } }
+	p1 := pr(mine, requested("alice"), head("sc-1/a"))
+	p2 := pr(head("b"), func(p *github.PR) { p.Number = 2 })
+	find := func(secs []Section, n int) (Group, Card) {
+		for _, s := range secs {
+			for _, c := range s.Cards {
+				if c.Number == n {
+					return s.Group, c
+				}
+			}
+		}
+		t.Fatalf("no card #%d", n)
+		return "", Card{}
+	}
+
+	secs := Build([]github.PR{p1, p2}, Options{Me: "me", Sessions: []claude.Session{
+		{Dir: "/w/1", Repo: "O/R", Branch: "sc-1/a"},
+		{Dir: "/w/2", Repo: "o/r", Branch: "sc-1/a"},
+		{Dir: "/w/3", Repo: "o/r", Branch: "B"},
+		{Dir: "/w/4", Repo: "o/x", Branch: "b"},
+	}})
+	g, c := find(secs, 1)
+	if g != WIP || !reflect.DeepEqual(c.Labels, []string{"Claude"}) || !reflect.DeepEqual(c.Claude, []string{"/w/1", "/w/2"}) {
+		t.Errorf("p1: group %s, card %+v", g, c)
+	}
+	if g, c := find(secs, 2); g != Team || c.Claude != nil {
+		t.Errorf("p2: group %s, Claude %q; want team, nil", g, c.Claude)
+	}
+
+	secs = Build([]github.PR{p2}, Options{Me: "me", Sessions: []claude.Session{{Dir: "/w/5", Repo: "o/r", Branch: "b"}}})
+	if g, c := find(secs, 2); g != Team || !reflect.DeepEqual(c.Claude, []string{"/w/5"}) {
+		t.Errorf("p2 with session: group %s, Claude %q; want team, [/w/5]", g, c.Claude)
 	}
 }
 
