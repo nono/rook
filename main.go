@@ -19,6 +19,7 @@ import (
 
 	"github.com/nono/rook/internal/app"
 	"github.com/nono/rook/internal/board"
+	"github.com/nono/rook/internal/claude"
 	"github.com/nono/rook/internal/config"
 	"github.com/nono/rook/internal/github"
 	"github.com/nono/rook/internal/web"
@@ -82,10 +83,19 @@ func serve(ctx context.Context, cfgPath string) error {
 		return err
 	}
 	client.Me = me
+	var sessions app.Sessions
+	if _, err := claude.Find(ctx, "/proc"); err != nil {
+		log.Printf("rook: no Claude Code sessions: %v", err)
+	} else {
+		sessions = func(ctx context.Context) []claude.Session {
+			s, _ := claude.Find(ctx, "/proc")
+			return s
+		}
+	}
 	src := func(ctx context.Context) board.Board {
 		ctx, cancel := context.WithTimeout(ctx, loadTimeout)
 		defer cancel()
-		return app.Load(ctx, client, me, cfg, time.Now)
+		return app.Load(ctx, client, sessions, me, cfg, time.Now)
 	}
 	ln, err := net.Listen("tcp", cfg.Listen)
 	if err != nil {
