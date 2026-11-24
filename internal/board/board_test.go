@@ -166,8 +166,8 @@ func TestStoryID(t *testing.T) {
 
 func TestBuild(t *testing.T) {
 	review := pr(requested("me"), func(p *github.PR) { p.Number = 1; p.Title = "[sc-9] Do it" })
-	older := pr(func(p *github.PR) { p.Number = 2 })
-	newer := pr(func(p *github.PR) { p.Number = 3; p.UpdatedAt = t0.Add(time.Hour) })
+	older := pr(func(p *github.PR) { p.Number = 3 })
+	newer := pr(func(p *github.PR) { p.Number = 2; p.UpdatedAt = t0.Add(time.Hour) })
 	wip := pr(mine, draft, requested("alice"), ci("FAILURE"), mergeable("UNKNOWN"), func(p *github.PR) { p.Number = 4 })
 
 	secs := Build([]github.PR{older, review, wip, newer}, Options{Me: "me", ShortcutWorkspace: "ws", ShowRepo: true})
@@ -195,7 +195,7 @@ func TestBuild(t *testing.T) {
 		t.Errorf("conflict and waiting should be empty")
 	}
 	team := secs[4].Cards
-	if len(team) != 2 || team[0].Number != 3 || team[1].Number != 2 {
+	if len(team) != 2 || team[0].Number != 2 || team[1].Number != 3 {
 		t.Fatalf("team cards not newest first: %+v", team)
 	}
 	c := secs[0].Cards[0]

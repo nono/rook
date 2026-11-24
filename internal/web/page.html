@@ -35,14 +35,15 @@
   .red { background: #fdd; color: #900; } .ylw { background: #ffefc2; color: #850; } .gry { background: #eee; color: #555; }
   .foot { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #6b7280; border-top: 1px solid #f0f0f0; padding-top: 7px; }
   .scid { font-family: ui-monospace, monospace; font-weight: 700; color: #5b21b6; text-decoration: none; }
+  .scid, .num, .ci { white-space: nowrap; flex-shrink: 0; }
   a.scid:hover { text-decoration: underline; }
   .foot2 { display: flex; align-items: center; font-size: 12px; color: #6b7280; }
   .owner { display: inline-flex; align-items: center; gap: 5px; } .owner.me { color: #9ca3af; }
 
   .ci { font-size: 13px; } .ci.green { color: #16a34a; } .ci.red { color: #dc2626; } .ci.pending { color: #ca8a04; } .ci.none { color: #9ca3af; }
-  .avs { display: inline-flex; gap: 3px; align-items: center; }
+  .avs { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px; align-items: center; min-width: 0; }
   .avw { position: relative; display: inline-block; line-height: 0; }
-  .av { border-radius: 50%; background: #ddd; }
+  .av { display: block; width: 22px; height: 22px; overflow: hidden; border-radius: 50%; background: #ddd; }
   .avw.requested .av { opacity: .45; outline: 1.5px dashed #9ca3af; outline-offset: 1px; }
   .avw.commented .av { outline: 2px solid #cbd5e1; }
   .avw.approved .av { outline: 2px solid #16a34a; }
@@ -55,7 +56,7 @@
 <body>
 <div class="bar">
   <h1>Rook</h1>
-  <span class="when">Data from {{.FetchedAt.Local.Format "15:04:05"}}</span>
+  <span class="when">Data from {{.FetchedAt.Local.Format "2006-01-02 15:04:05"}}</span>
   <button type="button" onclick="location.reload()">Refresh</button>
 </div>
 {{range .Errors}}<div class="err">{{.Repo}}: {{.Err}}</div>

@@ -31,7 +31,8 @@ var stateWords = map[board.ReviewerState]string{
 	board.Requested: "review requested",
 }
 
-// Age gives a short form of d: "5m", "3h", "2d".
+// Age gives a short form of d: "5m", "3h", "2d". A negative d (a local clock
+// behind GitHub's) gives "0m".
 func Age(d time.Duration) string {
 	switch {
 	case d >= 24*time.Hour:
@@ -39,7 +40,7 @@ func Age(d time.Duration) string {
 	case d >= time.Hour:
 		return fmt.Sprintf("%dh", int(d/time.Hour))
 	}
-	return fmt.Sprintf("%dm", int(d/time.Minute))
+	return fmt.Sprintf("%dm", int(max(d, 0)/time.Minute))
 }
 
 // loopbackHost tells if the Host header names this machine. Other names come
@@ -84,6 +85,7 @@ func NewHandler(src Source, now func() time.Time) http.Handler {
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store") // each load must read fresh data
 		_, _ = w.Write(buf.Bytes())
 	})
 }

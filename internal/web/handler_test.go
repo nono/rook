@@ -21,6 +21,8 @@ func TestAge(t *testing.T) {
 		5 * time.Minute:              "5m",
 		3*time.Hour + 10*time.Minute: "3h",
 		49 * time.Hour:               "2d",
+		-5 * time.Minute:             "0m",
+		-3 * time.Hour:               "0m",
 	} {
 		if got := Age(d); got != want {
 			t.Errorf("Age(%s) = %q, want %q", d, got, want)
@@ -75,6 +77,8 @@ func TestPageOrderAndContent(t *testing.T) {
 		"not reviewed", "draft", "stopPropagation", "Do it",
 		"updated 2h ago", "alice", "https://a/bob", "bob: approved", "core",
 		"background:#ea580c",
+		`window.open(card.dataset.url, "_blank", "noopener")`,
+		"Data from 2026-11-24",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("body does not contain %q", want)
@@ -96,7 +100,7 @@ func TestPageMine(t *testing.T) {
 	b.Sections[0].Cards[0].Mine = true
 	b.Sections[0].Cards[0].ShowRepo = true
 	_, body := get(t, b, http.MethodGet, "/")
-	if !strings.Contains(body, "mine") || !strings.Contains(body, "o/r") {
+	if !strings.Contains(body, "mine") || !strings.Contains(body, `<div class="repo">o/r</div>`) {
 		t.Fatal("mine card should say mine and show the repo")
 	}
 }
@@ -137,5 +141,28 @@ func TestNotFound(t *testing.T) {
 func TestMethodNotAllowed(t *testing.T) {
 	if code, _ := get(t, sampleBoard("x"), http.MethodPost, "/"); code != http.StatusMethodNotAllowed {
 		t.Fatalf("status = %d", code)
+	}
+}
+
+func TestPageIsNotCached(t *testing.T) {
+	h := NewHandler(func(context.Context) board.Board { return sampleBoard("x") }, func() time.Time { return now })
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Host = "127.0.0.1:7878"
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("Cache-Control = %q, want no-store", got)
+	}
+}
+
+// A card with many reviewers must wrap its avatars, not hide them.
+func TestAvatarsWrap(t *testing.T) {
+	i := strings.Index(pageHTML, ".avs {")
+	if i < 0 {
+		t.Fatal("no .avs rule")
+	}
+	rule := pageHTML[i : i+strings.Index(pageHTML[i:], "}")]
+	if !strings.Contains(rule, "flex-wrap: wrap") {
+		t.Fatalf(".avs rule = %q, want flex-wrap: wrap", rule)
 	}
 }
