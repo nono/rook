@@ -32,8 +32,9 @@ const usage = "usage: rook serve [--config PATH]"
 //go:embed rook.svg
 var icon []byte
 
-// loadTimeout limits the GitHub calls of one page load. A repo that is slower
-// gets an error banner, and the page shows the other repos.
+// loadTimeout limits the GitHub calls and the session scan of one page load.
+// A repo that is slower gets an error banner, and the page shows the other
+// repos.
 const loadTimeout = 8 * time.Second
 
 func main() {
@@ -83,26 +84,40 @@ func serve(ctx context.Context, cfgPath string) error {
 		return err
 	}
 	client.Me = me
-	var sessions app.Sessions
-	if _, err := claude.Find(ctx, "/proc"); err != nil {
-		log.Printf("rook: no Claude Code sessions: %v", err)
-	} else {
-		sessions = func(ctx context.Context) []claude.Session {
-			s, _ := claude.Find(ctx, "/proc")
-			return s
-		}
-	}
-	src := func(ctx context.Context) board.Board {
-		ctx, cancel := context.WithTimeout(ctx, loadTimeout)
-		defer cancel()
-		return app.Load(ctx, client, sessions, me, cfg, time.Now)
-	}
+	src := newSource(client, sessionSource("/proc", log.Printf), me, cfg)
 	ln, err := net.Listen("tcp", cfg.Listen)
 	if err != nil {
 		return err
 	}
 	log.Printf("rook: http://%s/ (user %s)", ln.Addr(), me)
 	return serveHTTP(ctx, ln, web.NewHandler(src, time.Now, icon))
+}
+
+// newSource gives the board of each page load, within loadTimeout.
+func newSource(f app.Fetcher, sessions app.Sessions, me string, cfg config.Config) web.Source {
+	return func(ctx context.Context) board.Board {
+		ctx, cancel := context.WithTimeout(ctx, loadTimeout)
+		defer cancel()
+		return app.Load(ctx, f, sessions, me, cfg, time.Now)
+	}
+}
+
+// sessionSource gives the Claude Code sessions of the processes in proc. It
+// gives nil, with one log line, when proc cannot be listed (not Linux) or git
+// is not in the PATH.
+func sessionSource(proc string, logf func(format string, args ...any)) app.Sessions {
+	if _, err := os.ReadDir(proc); err != nil {
+		logf("rook: no Claude Code sessions: %v", err)
+		return nil
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		logf("rook: no Claude Code sessions: %v", err)
+		return nil
+	}
+	return func(ctx context.Context) []claude.Session {
+		s, _ := claude.Find(ctx, proc)
+		return s
+	}
 }
 
 // serveHTTP serves h on ln until ctx ends. The end of ctx also cancels the

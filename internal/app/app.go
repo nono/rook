@@ -18,6 +18,10 @@ type Fetcher interface {
 	OpenPRs(ctx context.Context, repo string) ([]github.PR, error)
 }
 
+// sessionTimeout limits the scan of the sessions of one page load. A slow
+// git then costs the page one second at most.
+var sessionTimeout = time.Second
+
 // Sessions gives the open Claude Code sessions.
 type Sessions func(ctx context.Context) []claude.Session
 
@@ -33,7 +37,11 @@ func Load(ctx context.Context, f Fetcher, sessions Sessions, me string, cfg conf
 		wg.Go(func() { prs[i], errs[i] = f.OpenPRs(ctx, repo) })
 	}
 	if sessions != nil {
-		wg.Go(func() { open = sessions(ctx) })
+		wg.Go(func() {
+			ctx, cancel := context.WithTimeout(ctx, sessionTimeout)
+			defer cancel()
+			open = sessions(ctx)
+		})
 	}
 	wg.Wait()
 

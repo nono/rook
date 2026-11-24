@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -10,6 +11,11 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/nono/rook/internal/board"
+	"github.com/nono/rook/internal/claude"
+	"github.com/nono/rook/internal/config"
+	"github.com/nono/rook/internal/github"
 )
 
 func TestRunUsage(t *testing.T) {
@@ -93,5 +99,38 @@ func TestIconIsRookSVG(t *testing.T) {
 	}
 	if !bytes.Equal(icon, want) || !bytes.HasPrefix(icon, []byte("<svg")) {
 		t.Fatalf("icon is not rook.svg (%d bytes)", len(icon))
+	}
+}
+
+type fetcher []github.PR
+
+func (f fetcher) OpenPRs(context.Context, string) ([]github.PR, error) { return f, nil }
+
+// The page source gives the sessions to the board.
+func TestNewSourceUsesSessions(t *testing.T) {
+	p := github.PR{Repo: "o/a", Number: 1, HeadRefName: "x", Author: github.Actor{Login: "me"}, CIState: "SUCCESS", Mergeable: "MERGEABLE",
+		RequestedUsers: []github.Actor{{Login: "alice"}}}
+	sessions := func(context.Context) []claude.Session {
+		return []claude.Session{{Dir: "/w", Repo: "o/a", Branches: []string{"x"}}}
+	}
+	b := newSource(fetcher{p}, sessions, "me", config.Config{Repos: []string{"o/a"}})(context.Background())
+	if wip := b.Sections[1]; wip.Group != board.WIP || len(wip.Cards) != 1 || len(wip.Cards[0].Claude) != 1 {
+		t.Fatalf("WIP = %+v", wip)
+	}
+}
+
+func TestSessionSource(t *testing.T) {
+	var logs []string
+	logf := func(f string, args ...any) { logs = append(logs, fmt.Sprintf(f, args...)) }
+	if s := sessionSource(t.TempDir(), logf); s == nil || len(logs) != 0 {
+		t.Fatalf("readable proc: sessions nil = %v, logs = %q", s == nil, logs)
+	}
+	if s := sessionSource(filepath.Join(t.TempDir(), "none"), logf); s != nil || len(logs) != 1 || !strings.Contains(logs[0], "no Claude Code sessions") {
+		t.Fatalf("missing proc: sessions nil = %v, logs = %q", s == nil, logs)
+	}
+	logs = nil
+	t.Setenv("PATH", t.TempDir())
+	if s := sessionSource(t.TempDir(), logf); s != nil || len(logs) != 1 || !strings.Contains(logs[0], "git") {
+		t.Fatalf("no git: sessions nil = %v, logs = %q", s == nil, logs)
 	}
 }

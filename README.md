@@ -22,7 +22,7 @@ For your own PRs, drafts included:
 
 Your verdict is your last review that approves or requests changes. A reply in a review thread does not change it. Reviews by bots, by the PR author and by the logins in `ignore_reviewers` do not count.
 
-A Claude Code session is a `claude` process whose directory is a git checkout of the PR's repo and branch (the upstream branch, if set). An open session counts, idle or not. A session never moves a PR that you did not author, but each card with a session shows the Claude logo. This works on Linux only.
+A Claude Code session is a `claude` process whose directory is a git checkout of the PR's repo and branch (the upstream branch or the local branch). The directory is where the session started, so start the session in the worktree of the PR: a `cd` in the session does not count. An open session counts, idle or not. A session never moves a PR that you did not author, but each card with a session shows the Claude logo. This works on Linux only, with `git` in the PATH.
 
 ## Install
 
@@ -73,7 +73,7 @@ RestartSec=30
 WantedBy=default.target
 ```
 
-Rook runs `gh` at start. If `gh` is not in the PATH that `systemctl --user show-environment` gives, add its directory to the unit, for example `Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin`.
+Rook runs `gh` at start, and `git` at each page load. If `gh` or `git` is not in the PATH that `systemctl --user show-environment` gives, add its directory to the unit, for example `Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin`.
 
 If rook cannot start (network or `gh` not ready at login, or an error in the config), it stops and systemd starts it again 30 s later, with no end. For an error that does not go away, such as a bad config, read the cause with `journalctl --user -u rook`, fix it, and run `systemctl --user restart rook`.
 

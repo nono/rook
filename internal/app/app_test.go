@@ -154,3 +154,25 @@ func TestLoadSessionsInParallel(t *testing.T) {
 		t.Fatalf("errors = %+v, parallel = %v", b.Errors, parallel)
 	}
 }
+
+// A scan that does not end must not hold the page: it has its own deadline.
+func TestLoadSessionsDeadline(t *testing.T) {
+	defer func(d time.Duration) { sessionTimeout = d }(sessionTimeout)
+	sessionTimeout = 50 * time.Millisecond
+	sessions := func(ctx context.Context) []claude.Session {
+		<-ctx.Done()
+		return nil
+	}
+	done := make(chan board.Board)
+	go func() {
+		done <- Load(context.Background(), fake{"o/a": {pr("o/a")}}, sessions, "me", config.Config{Repos: []string{"o/a"}}, time.Now)
+	}()
+	select {
+	case b := <-done:
+		if len(cards(b)) != 1 {
+			t.Fatalf("cards = %+v", cards(b))
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Load waits for the sessions past their deadline")
+	}
+}
