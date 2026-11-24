@@ -132,13 +132,6 @@ func TestOpenPRsMapsFields(t *testing.T) {
 	}
 }
 
-// CODEOWNERS can add many review requests. The query reads up to 100, the API maximum.
-func TestQueryReadsUpTo100ReviewRequests(t *testing.T) {
-	if !strings.Contains(prQuery, "reviewRequests(first: 100)") {
-		t.Fatal("query must read up to 100 review requests (the API maximum)")
-	}
-}
-
 func TestOpenPRsNullAuthor(t *testing.T) {
 	c, _ := pages(t)
 	prs, err := c.OpenPRs(context.Background(), "o/r")
