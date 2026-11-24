@@ -26,8 +26,8 @@ type Source func(ctx context.Context) board.Board
 type groupStyle struct{ Name, Hint, Color string }
 
 var groupStyles = map[board.Group]groupStyle{
-	board.Review:   {"Review", "your turn to review", "#ea580c"},
-	board.WIP:      {"WIP", "your turn to fix", "#ca8a04"},
+	board.Review:   {"Review", "your turn to review", "#c2410c"},
+	board.WIP:      {"WIP", "your turn to fix", "#a16207"},
 	board.Conflict: {"Conflict", "rebase needed", "#dc2626"},
 	board.Waiting:  {"Waiting", "others' turn", "#2563eb"},
 	board.Team:     {"Team", "FYI", "#6b7280"},

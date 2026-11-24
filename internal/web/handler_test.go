@@ -88,7 +88,7 @@ func TestPageOrderAndContent(t *testing.T) {
 		`<span class="lab ylw">no reviewer</span>`, `<span class="lab gry">draft</span>`, "Do it",
 		`<span class="mk ok">✓</span>`, `<span class="mk ko">✗</span>`, `title="CI none">○<`, "carl: requested changes",
 		"updated 2h ago", "alice", "https://a/bob", "bob: approved", "core",
-		"background:#ea580c",
+		"background:#c2410c",
 		`<link rel="icon" href="/favicon.svg" type="image/svg+xml">`,
 		"Data from " + now.Local().Format("2006-01-02 15:04:05"),
 		"dave: review dismissed",
@@ -205,8 +205,8 @@ func TestEveryGroupHasStyle(t *testing.T) {
 		}
 	}
 	want := map[board.Group]groupStyle{
-		board.Review:   {"Review", "your turn to review", "#ea580c"},
-		board.WIP:      {"WIP", "your turn to fix", "#ca8a04"},
+		board.Review:   {"Review", "your turn to review", "#c2410c"},
+		board.WIP:      {"WIP", "your turn to fix", "#a16207"},
 		board.Conflict: {"Conflict", "rebase needed", "#dc2626"},
 		board.Waiting:  {"Waiting", "others' turn", "#2563eb"},
 		board.Team:     {"Team", "FYI", "#6b7280"},
@@ -268,6 +268,9 @@ func TestClaudeLogo(t *testing.T) {
 	i := strings.Index(body, `class="claude"`)
 	if ci := strings.Index(body, `class="ci `); ci < 0 || i < ci {
 		t.Errorf("logo at %d, before the CI dot at %d", i, ci)
+	}
+	if !strings.Contains(body[i:], `role="img" aria-label="Claude Code"`) {
+		t.Error("the logo has no accessible name")
 	}
 	tag, _, _ := strings.Cut(body[i:], ">")
 	tag = html.UnescapeString(tag)
