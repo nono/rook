@@ -60,14 +60,18 @@ To start rook at login, write `~/.config/systemd/user/rook.service`:
 ```ini
 [Unit]
 Description=Rook dashboard
+StartLimitIntervalSec=0
 
 [Service]
 ExecStart=%h/go/bin/rook serve
 Restart=on-failure
+RestartSec=30
 
 [Install]
 WantedBy=default.target
 ```
+
+Rook runs `gh` at start. If `gh` is not in `/usr/bin` or `/bin`, add its directory to the unit, for example `Environment=PATH=%h/.local/bin:/usr/bin:/bin`. If the network or `gh` is not ready at login, rook stops and systemd starts it again 30 s later, with no limit on the number of tries.
 
 Then run `systemctl --user enable --now rook`.
 
