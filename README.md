@@ -15,7 +15,7 @@ For a PR that you did not author:
 For your own PRs, drafts included:
 
 4. **WIP**: the CI is red or pending.
-5. **WIP**: no review is requested and no person reviewed it ("no reviewer").
+5. **WIP**: no review is requested from a person or a team, and no person reviewed it ("no reviewer").
 6. **Conflict**: the PR has a git conflict.
 7. **Waiting**: all the other PRs.
 
@@ -60,7 +60,6 @@ To start rook at login, write `~/.config/systemd/user/rook.service`:
 ```ini
 [Unit]
 Description=Rook dashboard
-StartLimitIntervalSec=0
 
 [Service]
 ExecStart=%h/go/bin/rook serve
@@ -71,7 +70,9 @@ RestartSec=30
 WantedBy=default.target
 ```
 
-Rook runs `gh` at start. If `gh` is not in `/usr/bin` or `/bin`, add its directory to the unit, for example `Environment=PATH=%h/.local/bin:/usr/bin:/bin`. If the network or `gh` is not ready at login, rook stops and systemd starts it again 30 s later, with no limit on the number of tries.
+Rook runs `gh` at start. If `gh` is not in the PATH that `systemctl --user show-environment` gives, add its directory to the unit, for example `Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin`.
+
+If rook cannot start (network or `gh` not ready at login, or an error in the config), it stops and systemd starts it again 30 s later, with no end. For an error that does not go away, such as a bad config, read the cause with `journalctl --user -u rook`, fix it, and run `systemctl --user restart rook`.
 
 Then run `systemctl --user enable --now rook`.
 

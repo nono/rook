@@ -77,7 +77,7 @@ Consequences, confirmed with the user:
 For a PR I authored (drafts included; a draft follows the same rules):
 
 4. CI red or pending → **WIP** ("CI red" / "CI pending").
-5. No review requested and no human review → **WIP** ("no reviewer").
+5. No review requested from a human or a team, and no human review → **WIP** ("no reviewer").
 6. Conflict → **conflict**.
 7. Else → **waiting**.
 
@@ -106,7 +106,7 @@ Card style: "Shortcut-like" (style C of the mockups, in `.superpowers/brainstorm
 - footer line 2: the author's avatar and login (or "mine"), and "updated Xd ago";
 - the whole card opens the PR in a new tab; the story link opens the story and does not open the PR.
 
-Reviewer avatars: one per human reviewer. The state is the reviewer's verdict (last `APPROVED` or `CHANGES_REQUESTED`), else "commented" if they have only `COMMENTED` reviews. A pending request overrides all of these. Green ring and ✓ = approved, red ring and ✗ = changes requested, gray ring = commented, faded and dashed = review requested. The tooltip gives login and state.
+Reviewer avatars: one per human reviewer. The state is the reviewer's verdict (last `APPROVED` or `CHANGES_REQUESTED`), else "commented" if they have `COMMENTED` reviews, else "review dismissed" (faded, dotted ring) if they have only `DISMISSED` reviews. A pending request overrides all of these. Green ring and ✓ = approved, red ring and ✗ = changes requested, gray ring = commented, faded and dashed = review requested. The tooltip gives login and state.
 
 Story ID: from the `[sc-NNNN]` prefix of the title. If there is none, from `sc-NNNN` in the head branch name. Else no link.
 
