@@ -139,6 +139,24 @@ func TestQueryReadsUpTo100ReviewRequests(t *testing.T) {
 	}
 }
 
+// The fake server answers any query, so the query text must hold each field
+// that pr() maps; a field lost here empties the data with no other failure.
+func TestQueryAsksForMappedFields(t *testing.T) {
+	for _, want := range []string{
+		"... on Team { slug }",
+		"... on EnterpriseTeam { slug }",
+		"mine: reviews(author: $me, last: 100)",
+		"reviews(last: 100)",
+		"statusCheckRollup { state }",
+		"commit { oid }",
+		"__typename login avatarUrl",
+	} {
+		if !strings.Contains(prQuery, want) {
+			t.Errorf("query does not ask for %q", want)
+		}
+	}
+}
+
 func TestOpenPRsNullAuthor(t *testing.T) {
 	c, _ := pages(t)
 	prs, err := c.OpenPRs(context.Background(), "o/r")
