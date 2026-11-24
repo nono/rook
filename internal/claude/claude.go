@@ -19,7 +19,7 @@ import (
 type Session struct {
 	Dir    string // the cwd of the process
 	Repo   string // "owner/name", as the remote URL gives it
-	Branch string // the local branch, without "refs/heads/": the PR head must have this name
+	Branch string // the local branch, without "refs/heads/"
 }
 
 // repoOf gives the "owner/name" of a GitHub remote URL: scp-like

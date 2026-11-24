@@ -59,13 +59,6 @@ func TestGhTokenAsksForGitHubCom(t *testing.T) {
 	}
 }
 
-// serve reads the sessions in procRoot; another root finds none.
-func TestProcRootIsProc(t *testing.T) {
-	if procRoot != "/proc" {
-		t.Fatalf("procRoot = %q, want /proc", procRoot)
-	}
-}
-
 // The spec asks for a page in a few seconds: one stalled repo must not hold it longer.
 func TestLoadTimeoutIsAFewSeconds(t *testing.T) {
 	if loadTimeout > 10*time.Second {

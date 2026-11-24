@@ -22,7 +22,7 @@ For your own PRs, drafts included:
 
 Your verdict is your last review that approves or requests changes. A reply in a review thread does not change it. Reviews by bots, by the PR author and by the logins in `ignore_reviewers` do not count.
 
-A Claude Code session is a `claude` process whose directory is a git checkout of the PR's repo, on a local branch with the name of the PR's branch. A `cd` in a Bash command of the session does not move its directory, so start the session in the worktree of the PR, or enter that worktree with the Claude Code worktree tool. An open session counts, idle or not. A session never moves a PR that you did not author, but each card with a session shows the Claude logo. This works on Linux only, with `git` in the PATH.
+A Claude Code session is a `claude` process whose directory is a git checkout of the PR's repo, on a local branch with the name of the PR's branch. The repo comes from the remote of the branch's upstream (else `origin`): a branch made from a branch of another remote matches only after `git push -u origin`. A `cd` in a Bash command of the session does not move its directory, so start the session in the worktree of the PR, or enter that worktree with the Claude Code worktree tool. An open session counts, idle or not. A session never moves a PR that you did not author, but each card with a session shows the Claude logo. This works on Linux only, with `git` in the PATH.
 
 ## Install
 
