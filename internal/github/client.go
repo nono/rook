@@ -89,7 +89,7 @@ type gqlPR struct {
 	Mine    struct{ Nodes []gqlReview }
 	Threads struct {
 		Nodes []struct {
-			IsResolved bool `json:"isResolved"`
+			IsResolved bool
 			Comments   struct {
 				Nodes []struct{ Author *gqlActor }
 			}
@@ -131,7 +131,7 @@ func (g gqlPR) pr(repo string) PR {
 		p.Reviews = append(p.Reviews, r)
 	}
 	for _, t := range g.Threads.Nodes {
-		if c := t.Comments.Nodes; !t.IsResolved && len(c) > 0 && c[0].Author != nil && c[0].Author.Login == coderabbit {
+		if c := t.Comments.Nodes; !t.IsResolved && len(c) > 0 && c[0].Author.actor().Login == coderabbit {
 			p.CodeRabbitThreads++
 		}
 	}

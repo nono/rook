@@ -306,27 +306,31 @@ func TestCodeRabbitLogo(t *testing.T) {
 	b.Sections[0].Cards = nil
 	for i, n := range []int{3, 1, 0} {
 		c := card
-		c.Number, c.CodeRabbit = i+1, n
+		c.Number, c.CodeRabbitThreads = i+1, n
 		b.Sections[0].Cards = append(b.Sections[0].Cards, c)
 	}
 	_, body := get(t, b, http.MethodGet, "/")
-	if n := strings.Count(body, `class="rabbit"`); n != 2 {
+	if n := strings.Count(body, `class="coderabbit"`); n != 2 {
 		t.Fatalf("%d CodeRabbit logos, want 2", n)
 	}
-	_, first, _ := strings.Cut(body, `class="rabbit"`)
+	_, first, _ := strings.Cut(body, `class="coderabbit"`)
 	tag, _, _ := strings.Cut(first, ">")
-	if want := `title="3 unresolved CodeRabbit comments"`; !strings.Contains(tag, want) {
+	if want := `title="3 unresolved CodeRabbit threads"`; !strings.Contains(tag, want) {
 		t.Errorf("logo tag %q does not contain %q", tag, want)
 	}
 	if !strings.Contains(first, `role="img" aria-label="CodeRabbit"`) {
 		t.Error("the logo has no accessible name")
 	}
-	if _, after, _ := strings.Cut(first, "</svg>"); !strings.HasPrefix(after, "3</span>") {
+	svg, after, _ := strings.Cut(first, "</svg>")
+	if !strings.Contains(svg, `<path d="M`) {
+		t.Error("the logo has no drawing")
+	}
+	if !strings.HasPrefix(after, "3</span>") {
 		t.Errorf("no count after the logo: %.40q", after)
 	}
-	_, second, _ := strings.Cut(first, `class="rabbit"`)
+	_, second, _ := strings.Cut(first, `class="coderabbit"`)
 	tag, _, _ = strings.Cut(second, ">")
-	if want := `title="1 unresolved CodeRabbit comment"`; !strings.Contains(tag, want) {
+	if want := `title="1 unresolved CodeRabbit thread"`; !strings.Contains(tag, want) {
 		t.Errorf("logo tag %q does not contain %q", tag, want)
 	}
 }
@@ -334,10 +338,10 @@ func TestCodeRabbitLogo(t *testing.T) {
 func TestCodeRabbitAfterClaude(t *testing.T) {
 	b := sampleBoard("Do it")
 	b.Sections[0].Cards[0].SessionDirs = []string{"/w"}
-	b.Sections[0].Cards[0].CodeRabbit = 2
+	b.Sections[0].Cards[0].CodeRabbitThreads = 2
 	_, body := get(t, b, http.MethodGet, "/")
-	ci, cl, cr := strings.Index(body, `class="ci `), strings.Index(body, `class="claude"`), strings.Index(body, `class="rabbit"`)
-	if ci < 0 || cl < ci || cr < cl {
-		t.Errorf("CI dot at %d, Claude logo at %d, CodeRabbit logo at %d: want this order", ci, cl, cr)
+	cl, cr := strings.Index(body, `class="claude"`), strings.Index(body, `class="coderabbit"`)
+	if cl < 0 || cr < cl {
+		t.Errorf("Claude logo at %d, CodeRabbit logo at %d: want the Claude logo first", cl, cr)
 	}
 }

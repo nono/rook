@@ -74,8 +74,8 @@ type Card struct {
 	UpdatedAt time.Time
 	// SessionDirs are the directories of the Claude Code sessions on the PR's branch.
 	SessionDirs []string
-	// CodeRabbit is the count of unresolved CodeRabbit threads on my PR, 0 on the others.
-	CodeRabbit int
+	// CodeRabbitThreads is the count of unresolved CodeRabbit threads on my PR, 0 on the others.
+	CodeRabbitThreads int
 }
 
 // Section is a group with its cards.
@@ -276,7 +276,7 @@ func Build(prs []github.PR, opts Options) []Section {
 			SessionDirs: dirs,
 		}
 		if c.Mine {
-			c.CodeRabbit = pr.CodeRabbitThreads
+			c.CodeRabbitThreads = pr.CodeRabbitThreads
 		}
 		if id != "" && opts.ShortcutWorkspace != "" {
 			c.StoryURL = "https://app.shortcut.com/" + opts.ShortcutWorkspace + "/story/" + id

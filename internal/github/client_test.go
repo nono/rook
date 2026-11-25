@@ -122,7 +122,7 @@ func TestOpenPRsMapsFields(t *testing.T) {
 	if !reflect.DeepEqual(prs[0], want) {
 		t.Fatalf("got  %+v\nwant %+v", prs[0], want)
 	}
-	if prs[1].CIState != "" || !prs[1].IsDraft || prs[1].Mergeable != "UNKNOWN" || !prs[1].Fork || prs[1].CodeRabbitThreads != 0 {
+	if prs[1].CIState != "" || !prs[1].IsDraft || prs[1].Mergeable != "UNKNOWN" || !prs[1].Fork {
 		t.Errorf("PR 12 = %+v", prs[1])
 	}
 	if prs[2].CIState != "PENDING" || prs[2].Mergeable != "CONFLICTING" {

@@ -301,7 +301,7 @@ func TestBuild(t *testing.T) {
 	}
 }
 
-func rabbit(n int) func(*github.PR) { return func(p *github.PR) { p.CodeRabbitThreads = n } }
+func threads(n int) func(*github.PR) { return func(p *github.PR) { p.CodeRabbitThreads = n } }
 
 // The CodeRabbit count shows on my PRs only, drafts included, and never
 // changes the group.
@@ -312,9 +312,9 @@ func TestBuildCodeRabbit(t *testing.T) {
 		group Group
 		want  int
 	}{
-		{"mine", pr(mine, requested("alice"), rabbit(3)), Waiting, 3},
-		{"mine draft", pr(mine, draft, requested("alice"), rabbit(2)), Waiting, 2},
-		{"not mine", pr(rabbit(3)), Team, 0},
+		{"mine", pr(mine, requested("alice"), threads(3)), Waiting, 3},
+		{"mine draft", pr(mine, draft, requested("alice"), threads(2)), Waiting, 2},
+		{"not mine", pr(threads(3)), Team, 0},
 		{"mine without threads", pr(mine, requested("alice")), Waiting, 0},
 	}
 	for _, c := range cases {
@@ -327,8 +327,8 @@ func TestBuildCodeRabbit(t *testing.T) {
 				got = s.Cards
 			}
 		}
-		if len(got) != 1 || got[0].CodeRabbit != c.want {
-			t.Errorf("%s: cards %+v, want CodeRabbit %d", c.name, got, c.want)
+		if len(got) != 1 || got[0].CodeRabbitThreads != c.want {
+			t.Errorf("%s: cards %+v, want CodeRabbitThreads %d", c.name, got, c.want)
 		}
 	}
 }
