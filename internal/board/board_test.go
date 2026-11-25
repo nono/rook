@@ -301,6 +301,38 @@ func TestBuild(t *testing.T) {
 	}
 }
 
+func rabbit(n int) func(*github.PR) { return func(p *github.PR) { p.CodeRabbitThreads = n } }
+
+// The CodeRabbit count shows on my PRs only, drafts included, and never
+// changes the group.
+func TestBuildCodeRabbit(t *testing.T) {
+	cases := []struct {
+		name  string
+		pr    github.PR
+		group Group
+		want  int
+	}{
+		{"mine", pr(mine, requested("alice"), rabbit(3)), Waiting, 3},
+		{"mine draft", pr(mine, draft, requested("alice"), rabbit(2)), Waiting, 2},
+		{"not mine", pr(rabbit(3)), Team, 0},
+		{"mine without threads", pr(mine, requested("alice")), Waiting, 0},
+	}
+	for _, c := range cases {
+		var got []Card
+		for _, s := range Build([]github.PR{c.pr}, Options{Me: "me"}) {
+			if len(s.Cards) > 0 {
+				if s.Group != c.group {
+					t.Errorf("%s: group %s, want %s", c.name, s.Group, c.group)
+				}
+				got = s.Cards
+			}
+		}
+		if len(got) != 1 || got[0].CodeRabbit != c.want {
+			t.Errorf("%s: cards %+v, want CodeRabbit %d", c.name, got, c.want)
+		}
+	}
+}
+
 func TestBuildSameTimeHigherNumberFirst(t *testing.T) {
 	low := pr(func(p *github.PR) { p.Number = 5 })
 	high := pr(func(p *github.PR) { p.Number = 7 })

@@ -24,6 +24,8 @@ Your verdict is your last review that approves or requests changes. A reply in a
 
 A Claude Code session is a `claude` process whose directory is a git checkout of the PR's repo, on a local branch with the name of the PR's branch. The repo comes from the remote of the branch's upstream (else `origin`): a branch made from a branch of another remote matches only after `git push -u origin`. A `cd` in a Bash command of the session does not move its directory, so start the session in the worktree of the PR, or enter that worktree with the Claude Code worktree tool. An open session counts, idle or not. A session never moves a PR that you did not author, but each card with a session shows the Claude logo. This works on Linux only, with `git` in the PATH.
 
+Each card of your PRs, drafts included, shows the CodeRabbit logo and a count when the PR has unresolved review threads that CodeRabbit started. A thread that you replied to counts until it is resolved. The logo does not change the group. Only the last 10 threads of a PR count: more threads make each page load cost more of the GitHub rate limit.
+
 ## Install
 
 ```sh

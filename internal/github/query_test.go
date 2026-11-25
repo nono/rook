@@ -23,6 +23,8 @@ func TestQueryAsksForMappedFields(t *testing.T) {
 		"repository.pullRequests.nodes.reviewRequests.nodes.requestedReviewer.User.avatarUrl",
 		"repository.pullRequests.nodes.reviewRequests.nodes.requestedReviewer.Team.slug",
 		"repository.pullRequests.nodes.reviewRequests.nodes.requestedReviewer.EnterpriseTeam.slug",
+		"repository.pullRequests.nodes.reviewThreads.nodes.isResolved",
+		"repository.pullRequests.nodes.reviewThreads.nodes.comments.nodes.author.login",
 	}
 	for _, f := range []string{"number", "title", "url", "isDraft", "updatedAt", "headRefName", "headRefOid", "mergeable",
 		"isCrossRepository", "author.__typename", "author.login", "author.avatarUrl"} {
@@ -44,14 +46,18 @@ func TestQueryAsksForMappedFields(t *testing.T) {
 // come back; with first: instead of last:, old reviews come back instead of
 // the newest; without author: $me, mine is a copy of the last 100 reviews.
 // reviewRequests reads 100, the API maximum: CODEOWNERS can request many.
+// reviewThreads reads the last 10: GitHub counts 100 PRs x N threads x 1
+// comment against the rate limit, so the cost of a page is about 4 + N points.
 func TestQueryArguments(t *testing.T) {
 	_, got := queryPaths(t, prQuery)
 	want := map[string]string{
 		"repository":              "owner:$owner,name:$name",
 		"repository.pullRequests": "states:OPEN,first:100,after:$cursor",
-		"repository.pullRequests.nodes.reviewRequests": "first:100",
-		"repository.pullRequests.nodes.reviews":        "last:100",
-		"repository.pullRequests.nodes.mine":           "author:$me,last:100",
+		"repository.pullRequests.nodes.reviewRequests":               "first:100",
+		"repository.pullRequests.nodes.reviews":                      "last:100",
+		"repository.pullRequests.nodes.mine":                         "author:$me,last:100",
+		"repository.pullRequests.nodes.reviewThreads":                "last:10",
+		"repository.pullRequests.nodes.reviewThreads.nodes.comments": "first:1",
 	}
 	if !maps.Equal(got, want) {
 		t.Errorf("arguments = %v\nwant %v", got, want)

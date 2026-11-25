@@ -42,4 +42,7 @@ type PR struct {
 	Reviews        []Review // any order
 	// CIState is the statusCheckRollup state of the head commit, "" when there are no checks.
 	CIState string
+	// CodeRabbitThreads is the count of unresolved review threads whose first
+	// comment is by CodeRabbit. Only the last 10 threads count.
+	CodeRabbitThreads int
 }

@@ -33,6 +33,14 @@
               {"id": "r0", "state": "CHANGES_REQUESTED", "submittedAt": "2026-11-23T07:00:00Z", "commit": {"oid": "h9"}, "author": {"__typename": "User", "login": "me", "avatarUrl": "https://a/me"}},
               {"id": "r3", "state": "APPROVED", "submittedAt": "2026-11-24T07:30:00Z", "commit": null, "author": {"__typename": "User", "login": "carol", "avatarUrl": "https://a/carol"}}
             ]},
+            "reviewThreads": {"nodes": [
+              {"isResolved": false, "comments": {"nodes": [{"author": {"login": "coderabbitai"}}]}},
+              {"isResolved": false, "comments": {"nodes": [{"author": {"login": "coderabbitai"}}]}},
+              {"isResolved": true, "comments": {"nodes": [{"author": {"login": "coderabbitai"}}]}},
+              {"isResolved": false, "comments": {"nodes": [{"author": {"login": "alice"}}]}},
+              {"isResolved": false, "comments": {"nodes": [{"author": null}]}},
+              {"isResolved": false, "comments": {"nodes": []}}
+            ]},
             "statusCheckRollup": {"state": "FAILURE"}
           },
           {

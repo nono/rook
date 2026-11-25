@@ -15,6 +15,9 @@ query($owner: String!, $name: String!, $cursor: String, $me: String) {
         mine: reviews(author: $me, last: 100) {
           nodes { id state submittedAt commit { oid } author { __typename login avatarUrl } }
         }
+        reviewThreads(last: 10) {
+          nodes { isResolved comments(first: 1) { nodes { author { login } } } }
+        }
         statusCheckRollup { state }
       }
     }

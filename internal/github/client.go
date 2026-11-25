@@ -85,10 +85,21 @@ type gqlPR struct {
 			}
 		}
 	} `json:"reviewRequests"`
-	Reviews           struct{ Nodes []gqlReview }
-	Mine              struct{ Nodes []gqlReview }
+	Reviews struct{ Nodes []gqlReview }
+	Mine    struct{ Nodes []gqlReview }
+	Threads struct {
+		Nodes []struct {
+			IsResolved bool `json:"isResolved"`
+			Comments   struct {
+				Nodes []struct{ Author *gqlActor }
+			}
+		}
+	} `json:"reviewThreads"`
 	StatusCheckRollup gqlRollup
 }
+
+// coderabbit is the GraphQL login of the CodeRabbit bot.
+const coderabbit = "coderabbitai"
 
 func (g gqlPR) pr(repo string) PR {
 	p := PR{
@@ -118,6 +129,11 @@ func (g gqlPR) pr(repo string) PR {
 			r.CommitOID = n.Commit.Oid
 		}
 		p.Reviews = append(p.Reviews, r)
+	}
+	for _, t := range g.Threads.Nodes {
+		if c := t.Comments.Nodes; !t.IsResolved && len(c) > 0 && c[0].Author != nil && c[0].Author.Login == coderabbit {
+			p.CodeRabbitThreads++
+		}
 	}
 	// GitHub gives the PR rollup for the head ref. It matched the rollup of
 	// the last commit on 134 open fork PRs of two public repos.

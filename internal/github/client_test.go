@@ -116,12 +116,13 @@ func TestOpenPRsMapsFields(t *testing.T) {
 			{Author: Actor{Login: "me", AvatarURL: "https://a/me"}, State: "CHANGES_REQUESTED",
 				SubmittedAt: time.Date(2026, 11, 23, 7, 0, 0, 0, time.UTC), CommitOID: "h9"},
 		},
-		CIState: "FAILURE",
+		CIState:           "FAILURE",
+		CodeRabbitThreads: 2,
 	}
 	if !reflect.DeepEqual(prs[0], want) {
 		t.Fatalf("got  %+v\nwant %+v", prs[0], want)
 	}
-	if prs[1].CIState != "" || !prs[1].IsDraft || prs[1].Mergeable != "UNKNOWN" || !prs[1].Fork {
+	if prs[1].CIState != "" || !prs[1].IsDraft || prs[1].Mergeable != "UNKNOWN" || !prs[1].Fork || prs[1].CodeRabbitThreads != 0 {
 		t.Errorf("PR 12 = %+v", prs[1])
 	}
 	if prs[2].CIState != "PENDING" || prs[2].Mergeable != "CONFLICTING" {
